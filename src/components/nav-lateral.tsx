@@ -30,6 +30,7 @@ import {
   SidebarRail,
 } from "@/components/shadcn/sidebar";
 import { signOut } from "@/app/actions/auth";
+import { LogoTrilha, SimboloTrilha } from "@/components/logo-trilha";
 
 /** Os ícones por nome, para o layout (servidor) poder descrever o menu. */
 const ICONES = {
@@ -88,11 +89,12 @@ export function NavLateral({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                  T
+                {/* Menu recolhido: só o "T" da marca no quadrado azul. */}
+                <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:flex">
+                  <SimboloTrilha className="size-4" />
                 </span>
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="font-semibold text-foreground">Trilha</span>
+                <span className="flex min-w-0 flex-col gap-1.5 leading-tight group-data-[collapsible=icon]:hidden">
+                  <LogoTrilha className="h-4 w-auto self-start text-[#26305a]" />
                   <span className="text-xs text-muted-foreground">{papel}</span>
                 </span>
               </Link>

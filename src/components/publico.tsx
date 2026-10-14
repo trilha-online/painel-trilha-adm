@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { LogoTrilha } from "@/components/logo-trilha";
 
 /**
  * A moldura das páginas públicas: simulador, condições, proposta,
@@ -53,16 +54,9 @@ export function MolduraPublica({
   );
 }
 
-/** O logo: quadrado com o "T" e o nome. Branco sobre a faixa azul-marinho. */
+/** O logo oficial, branco sobre a faixa azul-marinho (na impressão, na cor do texto). */
 export function Marca() {
-  return (
-    <span className="flex items-center gap-2.5">
-      <span className="flex size-7 items-center justify-center rounded-md bg-primary-foreground text-sm font-bold text-primary print:border print:border-foreground">
-        T
-      </span>
-      <span className="text-base font-semibold tracking-tight">Trilha</span>
-    </span>
-  );
+  return <LogoTrilha className="h-[18px] w-auto" />;
 }
 
 /** Aviso de "não deu": link vencido, unidade indisponível. Âmbar, não vermelho — não é culpa de quem abriu. */

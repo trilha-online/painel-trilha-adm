@@ -7,6 +7,12 @@ export type Conta = {
   tipo: ContaTipo;
   nome: string;
   email: string | null;
+  /**
+   * Acesso ligado. Por enquanto só o admin da Trilha pode ser desligado — a
+   * conferência de verdade está em `eh_admin_trilha()`, no banco; aqui é o
+   * espelho, para o app não mostrar um painel que o banco vai recusar.
+   */
+  ativo: boolean;
 };
 
 export type Sessao = {
@@ -59,7 +65,7 @@ export async function getSessao(): Promise<Sessao | null> {
 
   const { data: conta, error } = await supabase
     .from("conta")
-    .select("id, tipo, nome, email")
+    .select("id, tipo, nome, email, ativo")
     .eq("id", user.id)
     .maybeSingle<Conta>();
 
@@ -115,7 +121,22 @@ export async function getSessao(): Promise<Sessao | null> {
   };
 }
 
-export const ehAdmin = (sessao: Sessao | null) => sessao?.conta?.tipo === "trilha_admin";
+/**
+ * Admin da Trilha COM acesso ligado.
+ *
+ * O `ativo` entra aqui porque o desligamento tem de valer nas duas camadas: no
+ * banco ele já vale sozinho (`eh_admin_trilha()` o exige, e com isso todas as
+ * policies de uma vez), e esta função é o que impede o app de abrir uma tela
+ * que o banco responderia vazia. Quem está desativado não é tratado como
+ * parceiro nem como incorporadora: o layout do painel o manda para
+ * `/acesso-desativado`.
+ */
+export const ehAdmin = (sessao: Sessao | null) =>
+  sessao?.conta?.tipo === "trilha_admin" && sessao.conta.ativo;
+
+/** Conta que existe mas está com o acesso desligado. */
+export const contaDesativada = (sessao: Sessao | null) =>
+  Boolean(sessao?.conta) && !sessao!.conta!.ativo;
 
 export const ehParceiro = (sessao: Sessao | null) => sessao?.conta?.tipo === "parceiro";
 
@@ -132,5 +153,5 @@ export const ehParceiroTrilha = (sessao: Sessao | null) =>
  * rotas de formulário, para ele não chegar numa tela que só falharia no fim.
  */
 export const podeEditar = (sessao: Sessao | null) =>
-  sessao?.conta?.tipo === "trilha_admin" || sessao?.conta?.tipo === "incorporadora";
+  ehAdmin(sessao) || sessao?.conta?.tipo === "incorporadora";
 

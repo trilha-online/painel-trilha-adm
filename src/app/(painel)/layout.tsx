@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { getSessao } from "@/lib/sessao";
+import { redirect } from "next/navigation";
+import { contaDesativada, getSessao } from "@/lib/sessao";
 import { NavLateral } from "@/components/nav-lateral";
 import { Migalhas } from "@/components/migalhas";
 import { SinoAvisos } from "@/components/sino-avisos";
@@ -8,6 +9,11 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/shad
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const sessao = await getSessao();
+
+  // Acesso desligado sai do painel aqui, num lugar só, em vez de em cada tela.
+  // A tela de destino mora fora deste grupo, senão o desvio seria circular.
+  if (contaDesativada(sessao)) redirect("/acesso-desativado");
+
   const admin = sessao?.conta?.tipo === "trilha_admin";
   const parceiro = sessao?.conta?.tipo === "parceiro";
   const parceiroTrilha = parceiro && Boolean(sessao?.parceiroTrilha);
@@ -119,6 +125,15 @@ export default async function PainelLayout({ children }: { children: React.React
           },
         ];
 
+  // ADMINISTRADORES FICA FORA DOS GRUPOS, solto embaixo da marca. Esteve em
+  // "Cadastros" por um dia e ficou errado: ali ele se lia como mais um
+  // registro ao lado de vendedor e corretor, quando é outra categoria de
+  // coisa — quem OPERA o sistema, não quem o sistema atende. E é a única
+  // tela do painel que mexe em quem pode entrar.
+  const topo = admin
+    ? { href: "/administradores", label: "Administradores", icone: "equipe" as const }
+    : undefined;
+
   // O menu recolhido ou aberto fica num cookie, lido aqui para a página já
   // nascer no estado certo — sem o menu "pular" ao carregar.
   const menuAberto = (await cookies()).get("sidebar_state")?.value !== "false";
@@ -127,6 +142,7 @@ export default async function PainelLayout({ children }: { children: React.React
     <SidebarProvider defaultOpen={menuAberto}>
       <NavLateral
         grupos={grupos}
+        topo={topo}
         papel={
           admin
             ? "Painel da Trilha"

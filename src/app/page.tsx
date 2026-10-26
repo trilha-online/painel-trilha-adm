@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
-import { ehParceiroTrilha, ehProprietarioPF, getSessao } from "@/lib/sessao";
+import { contaDesativada, ehParceiroTrilha, ehProprietarioPF, getSessao } from "@/lib/sessao";
 
 export default async function Home() {
   const sessao = await getSessao();
+
+  // Antes de decidir a porta: quem está desligado não tem porta nenhuma.
+  if (contaDesativada(sessao)) redirect("/acesso-desativado");
+
   // O admin cai nas PROPOSTAS: é a única fila do sistema onde alguém está
   // parado esperando por ele. Até a 6.4 ele caía na importação, que fazia
   // sentido quando o sistema era cadastro de estoque — hoje a importação se usa

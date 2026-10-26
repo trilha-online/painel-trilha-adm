@@ -12,6 +12,7 @@ import {
   KeyRound,
   LogOut,
   Route,
+  ShieldUser,
   UserRound,
   Users,
   type LucideIcon,
@@ -42,6 +43,7 @@ const ICONES = {
   parceiros: Users,
   jornada: Route,
   casa: House,
+  equipe: ShieldUser,
 } satisfies Record<string, LucideIcon>;
 
 export type ItemMenu = { href: string; label: string; icone: keyof typeof ICONES };
@@ -56,6 +58,16 @@ export type ItemMenu = { href: string; label: string; icone: keyof typeof ICONES
 export type GrupoMenu = { titulo: string; itens: ItemMenu[] };
 
 /**
+ * Um item solto logo abaixo da marca, fora dos grupos.
+ *
+ * É para o que não é trabalho do dia nem cadastro de negócio — hoje, só
+ * "Administradores". Ficava em Cadastros e dava a entender que administrador
+ * é mais um registro ao lado de vendedor e corretor; é outra categoria de
+ * coisa: quem opera o sistema, não quem o sistema atende.
+ */
+export type ItemTopo = ItemMenu;
+
+/**
  * O menu lateral do painel.
  *
  * Recolhível: no computador vira uma faixa só de ícones (o estado fica num
@@ -66,6 +78,7 @@ export type GrupoMenu = { titulo: string; itens: ItemMenu[] };
  */
 export function NavLateral({
   grupos,
+  topo,
   papel,
   nome,
   email,
@@ -73,6 +86,7 @@ export function NavLateral({
   mostrarSimulador,
 }: {
   grupos: GrupoMenu[];
+  topo?: ItemTopo;
   papel: string;
   nome: string;
   email: string;
@@ -81,6 +95,9 @@ export function NavLateral({
 }) {
   const caminho = usePathname();
   const ativo = (href: string) => caminho === href || caminho.startsWith(`${href}/`);
+
+  const IconeTopo = topo ? ICONES[topo.icone] : null;
+  const topoAtivo = Boolean(topo) && ativo(topo!.href);
 
   return (
     <Sidebar collapsible="icon">
@@ -101,6 +118,18 @@ export function NavLateral({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {topo && IconeTopo ? (
+          <SidebarMenu className="mt-1 border-t border-sidebar-border pt-1.5">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={topoAtivo} tooltip={topo.label}>
+                <Link href={topo.href} aria-current={topoAtivo ? "page" : undefined}>
+                  <IconeTopo className={topoAtivo ? "text-destaque" : "text-muted-foreground"} />
+                  <span>{topo.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent>

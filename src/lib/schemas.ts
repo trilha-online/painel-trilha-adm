@@ -18,6 +18,37 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Senha deve ter ao menos 6 caracteres"),
 });
 
+// ----------------------------------------------------- administradores
+
+/**
+ * Administrador da Trilha. Poucos campos de propósito: o admin NÃO tem
+ * cadastro próprio como a incorporadora ou o parceiro — ele é a própria linha
+ * da tabela `conta`, que já guarda nome, e-mail e telefone.
+ *
+ * Sem dados bancários: admin não recebe repasse. Se um dia um sócio também
+ * for corretor, ele é um `parceiro` à parte, com outro login.
+ */
+const dadosAdmin = {
+  nome: req("Nome").min(3, "Nome muito curto"),
+  // Opcional porque hoje nada usa: o alerta das rotinas vai para o telefone
+  // de `config_financeiro`, não para o de cada admin.
+  telefone: opt().refine((v) => !v || isValidPhone(v), "Telefone inválido"),
+};
+
+export const adminSchema = z.object({
+  ...dadosAdmin,
+  acesso: z.object({
+    email: req("E-mail de acesso").refine(isValidEmail, "E-mail inválido"),
+    senha: z.string().min(8, "A senha precisa ter ao menos 8 caracteres"),
+  }),
+});
+
+/** Edição: o acesso tem tela própria, como no parceiro. */
+export const adminEdicaoSchema = z.object(dadosAdmin);
+
+export type AdminFormValues = z.infer<typeof adminSchema>;
+export type AdminEdicaoValues = z.infer<typeof adminEdicaoSchema>;
+
 // ------------------------------------------------------ dados bancários
 
 /**

@@ -7,12 +7,16 @@ import { ehAdmin, getSessao } from "@/lib/sessao";
 import { enviarMensagem } from "@/lib/avisos";
 
 /**
- * O sino e a tela de Avisos. Tudo só da Trilha, conferido aqui antes de
- * qualquer coisa.
+ * O sino e a tela de Avisos.
  *
- * LEITURA pela sessão (as regras do banco já limitam ao admin); ESCRITA pela
- * chave de servidor, depois da conferência — ninguém escreve nessas tabelas
- * pela sessão.
+ * O sino é de todo mundo desde out/2026: cada um vê os avisos que são dele
+ * (incorporadora, PF, corretor), e a Trilha os dela. Quem vê o quê é regra do
+ * BANCO (`avisos-3-sino-por-pessoa.sql`): a leitura é pela sessão e só volta
+ * o que a pessoa pode ler. A Trilha lê todos, então o sino dela filtra os sem
+ * destinatário. A tela de Avisos e o reenvio continuam só da Trilha.
+ *
+ * ESCRITA pela chave de servidor, depois da conferência — ninguém escreve
+ * nessas tabelas pela sessão.
  */
 
 export type AvisoDoSino = {
@@ -30,19 +34,28 @@ export type ResumoSino = { naoLidos: number; recentes: AvisoDoSino[] };
 /** Até onde o sino olha. Aviso mais antigo que isso não conta como novo. */
 const JANELA = 100;
 
-export async function resumoDoSino(): Promise<ResumoSino | null> {
-  const sessao = await getSessao();
-  if (!ehAdmin(sessao)) return null;
-
-  const supabase = await createClient();
-  const { data: avisos } = await supabase
+/**
+ * Os avisos que o sino desta pessoa mostra. Pela SESSÃO: para quem não é da
+ * Trilha, o banco só devolve os dele. Para a Trilha, que lê tudo, o filtro
+ * deixa só os avisos da Trilha.
+ */
+async function avisosDoSino(supabase: Awaited<ReturnType<typeof createClient>>, daTrilha: boolean) {
+  let consulta = supabase
     .from("aviso")
     .select("id, titulo, texto, gravidade, link, created_at")
     .order("created_at", { ascending: false })
-    .limit(JANELA)
-    .returns<Omit<AvisoDoSino, "lido">[]>();
+    .limit(JANELA);
+  if (daTrilha) consulta = consulta.is("incorporadora_id", null).is("parceiro_id", null);
+  const { data } = await consulta.returns<Omit<AvisoDoSino, "lido">[]>();
+  return data ?? [];
+}
 
-  const lista = avisos ?? [];
+export async function resumoDoSino(): Promise<ResumoSino | null> {
+  const sessao = await getSessao();
+  if (!sessao?.conta || !sessao.conta.ativo) return null;
+
+  const supabase = await createClient();
+  const lista = await avisosDoSino(supabase, ehAdmin(sessao));
   if (lista.length === 0) return { naoLidos: 0, recentes: [] };
 
   const { data: lidos } = await supabase
@@ -66,16 +79,15 @@ export async function resumoDoSino(): Promise<ResumoSino | null> {
 /** Sem ids: marca como lido tudo o que o sino mostra. */
 export async function marcarAvisosLidos(ids?: string[]): Promise<void> {
   const sessao = await getSessao();
-  if (!ehAdmin(sessao)) return;
+  if (!sessao?.conta || !sessao.conta.ativo) return;
 
-  const admin = createAdminClient();
-  let alvo = ids;
-  if (!alvo) {
-    const { data } = await admin.from("aviso").select("id").order("created_at", { ascending: false }).limit(JANELA);
-    alvo = (data ?? []).map((a: { id: string }) => a.id);
-  }
+  // Só marca o que a pessoa enxerga: a lista vem pela sessão, e os ids
+  // recebidos são cruzados com ela.
+  const visiveis = (await avisosDoSino(await createClient(), ehAdmin(sessao))).map((a) => a.id);
+  const alvo = ids ? ids.filter((id) => visiveis.includes(id)) : visiveis;
   if (alvo.length === 0) return;
 
+  const admin = createAdminClient();
   await admin
     .from("aviso_lido")
     .upsert(

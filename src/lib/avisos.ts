@@ -44,6 +44,13 @@ export type NovoAviso = {
   titulo: string;
   texto?: string;
   link?: string;
+  /**
+   * Destinatário. Sem nenhum dos dois, o aviso é da Trilha. Com um deles, vai
+   * para o sino daquela incorporadora (ou PF) ou daquele corretor — e só ele
+   * lê (`avisos-3-sino-por-pessoa.sql`).
+   */
+  incorporadoraId?: string | null;
+  parceiroId?: string | null;
 };
 
 /** Tentativas automáticas (a primeira na hora + as da rotina). */
@@ -62,6 +69,10 @@ export async function criarAviso(admin: Admin, aviso: NovoAviso): Promise<void> 
     titulo: aviso.titulo.slice(0, 300),
     texto: aviso.texto?.slice(0, 4000) ?? null,
     link: aviso.link ?? null,
+    // Só quando há destinatário: assim o aviso da Trilha não depende das
+    // colunas novas existirem (código publicado antes do SQL continua avisando).
+    ...(aviso.incorporadoraId ? { incorporadora_id: aviso.incorporadoraId } : {}),
+    ...(aviso.parceiroId ? { parceiro_id: aviso.parceiroId } : {}),
   };
 
   const { error } = aviso.chave

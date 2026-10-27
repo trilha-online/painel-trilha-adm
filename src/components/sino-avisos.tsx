@@ -16,7 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * O sino do cabeçalho (só a Trilha).
+ * O sino do cabeçalho. Cada um vê os seus avisos (a regra está no banco); só
+ * a Trilha tem a tela de Avisos por extenso, com o log de mensagens.
  *
  * O layout do painel não é redesenhado a cada navegação, então o sino busca
  * sozinho: ao abrir a página, a cada troca de tela e a cada minuto. Barato —
@@ -36,7 +37,7 @@ const quando = (iso: string) => {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
 };
 
-export function SinoAvisos() {
+export function SinoAvisos({ daTrilha }: { daTrilha: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [resumo, setResumo] = useState<ResumoSino | null>(null);
@@ -61,7 +62,8 @@ export function SinoAvisos() {
   const abrir = async (id: string, link: string | null) => {
     await marcarAvisosLidos([id]);
     atualizar();
-    router.push(link ?? "/avisos");
+    if (link) router.push(link);
+    else if (daTrilha) router.push("/avisos");
   };
 
   return (
@@ -110,12 +112,16 @@ export function SinoAvisos() {
         ) : (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground">Nenhum aviso por enquanto.</p>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/avisos" className="justify-center text-sm">
-            Ver todos os avisos e mensagens
-          </Link>
-        </DropdownMenuItem>
+        {daTrilha ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/avisos" className="justify-center text-sm">
+                Ver todos os avisos e mensagens
+              </Link>
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

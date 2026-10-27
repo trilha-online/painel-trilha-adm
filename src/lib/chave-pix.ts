@@ -16,7 +16,7 @@
  */
 
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { despachar, digitosDe, enfileirar, type Papel } from "@/lib/avisos";
+import { criarAviso, despachar, digitosDe, enfileirar, type Papel } from "@/lib/avisos";
 import { formatBRL } from "@/lib/br";
 import {
   textoChavePixAlterada,
@@ -75,12 +75,19 @@ type DonoTipo = "incorporadora" | "parceiro";
 
 type Dono = {
   nome: string;
-  telefone: string;
+  /** Sem telefone não há WhatsApp, mas o aviso no sino sai do mesmo jeito. */
+  telefone: string | null;
   contaId: string | null;
   papel: Papel;
   /** Onde ele mesmo corrige a chave. Nulo enquanto não houver tela para ele. */
   link: string | null;
+  /** O mesmo lugar, como caminho do painel — para o aviso no sino. */
+  caminho: string | null;
 };
+
+/** Para quem vai o aviso no sino. */
+const destinatario = (tipo: DonoTipo, id: string) =>
+  tipo === "parceiro" ? { parceiroId: id } : { incorporadoraId: id };
 
 async function lerDono(admin: Admin, tipo: DonoTipo, id: string): Promise<Dono | null> {
   if (tipo === "parceiro") {
@@ -89,9 +96,9 @@ async function lerDono(admin: Admin, tipo: DonoTipo, id: string): Promise<Dono |
       .select("nome, telefone, conta_id")
       .eq("id", id)
       .maybeSingle<{ nome: string; telefone: string | null; conta_id: string | null }>();
-    if (!data?.telefone) return null;
+    if (!data) return null;
     // O corretor ainda não edita os próprios dados (ciclo 4): sem link.
-    return { nome: data.nome, telefone: data.telefone, contaId: data.conta_id, papel: "corretor", link: null };
+    return { nome: data.nome, telefone: data.telefone, contaId: data.conta_id, papel: "corretor", link: null, caminho: null };
   }
 
   const { data } = await admin
@@ -107,14 +114,15 @@ async function lerDono(admin: Admin, tipo: DonoTipo, id: string): Promise<Dono |
       tipo: string;
     }>();
   // O responsável é quem fala pela empresa; o telefone geral é o reserva.
-  const telefone = data?.resp_telefone || data?.telefone;
-  if (!data || !telefone) return null;
+  if (!data) return null;
+  const telefone = data.resp_telefone || data.telefone || null;
   return {
     nome: data.resp_nome ?? data.nome,
     telefone,
     contaId: data.conta_id,
     papel: "vendedor",
     link: data.conta_id ? painel("/perfil") : null,
+    caminho: data.conta_id ? "/perfil" : null,
   };
 }
 
@@ -172,10 +180,26 @@ export async function avisarTrocasDeChave(admin: Admin): Promise<string[]> {
       const donoId = t.incorporadora_id ?? t.parceiro_id;
       const dono = donoId ? await lerDono(admin, t.dono_tipo, donoId) : null;
 
-      if (dono) {
+      if (dono && donoId) {
         const propria = Boolean(t.alterado_por && t.alterado_por === dono.contaId);
         const quemTrocou = await descreverQuem(admin, t);
-        const novos = await enfileirar(admin, [
+        const nova = mascararChave(t.chave_nova);
+
+        // O sino do dono: sai mesmo sem telefone.
+        await criarAviso(admin, {
+          chave: `pix-dono:${hash(k)}`,
+          tipo: "chave_pix",
+          gravidade: propria ? "info" : "atencao",
+          titulo: propria ? "Sua chave Pix foi alterada" : `Sua chave Pix foi alterada por ${quemTrocou}`,
+          texto:
+            `Em ${quandoBR(t.created_at)}. ` +
+            (nova ? `Nova chave: ${nova}.` : "A chave foi removida: sem ela, os repasses não saem.") +
+            " Se não foi você quem pediu, fale com a equipe da Trilha.",
+          link: dono.caminho ?? undefined,
+          ...destinatario(t.dono_tipo, donoId),
+        });
+
+        const novos = !dono.telefone ? [] : await enfileirar(admin, [
           {
             // Sem a chave em si: a chave da fila é visível no log de mensagens.
             chave: `pix-troca:${hash(k)}`,
@@ -188,7 +212,7 @@ export async function avisarTrocasDeChave(admin: Admin): Promise<string[]> {
               quemTrocou,
               propria,
               quando: quandoBR(t.created_at),
-              chaveNova: mascararChave(t.chave_nova),
+              chaveNova: nova,
               link: dono.link,
             }),
           },
@@ -196,8 +220,8 @@ export async function avisarTrocasDeChave(admin: Admin): Promise<string[]> {
         ids.push(...novos);
       }
 
-      // Marca mesmo sem telefone: não há o que tentar de novo, e a Trilha já
-      // tem o aviso no sino.
+      // Marca mesmo sem telefone: o sino do dono já recebeu, e não há o que
+      // tentar de novo pelo WhatsApp.
       await admin
         .from("chave_pix_alteracao")
         .update({ dono_avisado_em: new Date().toISOString() })
@@ -272,13 +296,29 @@ export async function avisarDonoDoRepasse(
     const tipo: DonoTipo = l.beneficiario === "corretor" ? "parceiro" : "incorporadora";
     const donoId = l.parceiro_id ?? l.incorporadora_id;
     const dono = donoId ? await lerDono(admin, tipo, donoId) : null;
-    if (!dono) return [];
+    if (!dono || !donoId) return [];
 
     // A chave que o repasse tentou usar é a de AGORA no cadastro.
     const { data: chaves } = await admin.rpc("chave_pix_do_lote", { p_lote: loteId });
     const chave = (chaves as { chave: string | null }[] | null)?.[0]?.chave ?? null;
 
     const [ano, mes] = l.data_ref.split("-");
+    const valor = formatBRL(Number(l.valor));
+
+    await criarAviso(admin, {
+      chave: `pix-recusada-dono:${loteId}`,
+      tipo: "repasse",
+      gravidade: "problema",
+      titulo: `Repasse de ${valor} não enviado: confira sua chave Pix`,
+      texto:
+        motivo === "sem_chave"
+          ? "Não há chave Pix cadastrada. Cadastre e fale com a equipe da Trilha para enviarmos de novo."
+          : `A chave cadastrada (${mascararChave(chave) ?? "—"}) não funcionou. Corrija e fale com a equipe da Trilha para enviarmos de novo.`,
+      link: dono.caminho ?? undefined,
+      ...destinatario(tipo, donoId),
+    });
+
+    if (!dono.telefone) return [];
     return await enfileirar(admin, [
       {
         chave: `pix-recusada:${loteId}`,
@@ -288,7 +328,7 @@ export async function avisarDonoDoRepasse(
         assunto: "Repasse não enviado: chave Pix",
         texto: textoRepasseChaveRecusada({
           nome: dono.nome,
-          valor: formatBRL(Number(l.valor)),
+          valor,
           referencia: `${mes}/${ano}`,
           motivo,
           chave: mascararChave(chave),

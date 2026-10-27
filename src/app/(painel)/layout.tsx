@@ -164,7 +164,7 @@ export default async function PainelLayout({ children }: { children: React.React
           <SidebarTrigger className="-ml-1 text-muted-foreground" />
           <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-4" />
           <Migalhas />
-          {admin ? <SinoAvisos /> : null}
+          {sessao?.conta ? <SinoAvisos daTrilha={admin} /> : null}
         </header>
       {/* `SidebarInset` já é o <main> da página; aqui é só o miolo. */}
       <div className="min-w-0 flex-1 px-4 py-8 lg:px-8">

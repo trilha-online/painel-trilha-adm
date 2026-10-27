@@ -18,6 +18,14 @@ export const TAXA_REAJUSTE_MENSAL = 0.0042;
 export const TAXA_GESTAO_MENSAL = 0.001;
 
 /**
+ * Piso da gestão, em reais por mês. A gestão é o MAIOR entre R$ 296 e 0,1% da
+ * base — então o piso vale até a base de R$ 296 mil e, dali para cima, manda o
+ * percentual. A comparação é com a base (valor reajustado), não com o preço de
+ * hoje: decisão de 26/out.
+ */
+export const GESTAO_MINIMA_MENSAL = 296;
+
+/**
  * Comissão dos parceiros imobiliários quando a incorporadora não define a
  * dela: 6% do valor ajustado do imóvel. Sai da entrada, nunca do saldo, e é
  * paga parcelada ao longo da Trilha.

@@ -63,6 +63,17 @@ type Entrada = {
 const digitos = (v: string | undefined | null) => (v ?? "").replace(/\D/g, "");
 const normalizarEmail = (v: string) => v.trim().toLowerCase();
 
+/**
+ * Uma proposta aberta por CPF (decisão de 27/out). A mesma frase está no
+ * gatilho `proposta_trava_cpf` do banco. Não diz qual corretor nem qual
+ * unidade: quem digita um CPF não precisa saber de quem é a outra proposta.
+ */
+const AVISO_PROPOSTA_ABERTA =
+  "Já existe uma proposta em análise para este CPF. Aguarde a resposta da Trilha ou fale com a equipe.";
+
+/** Situações em que a proposta ainda prende o CPF. Recusada, invalidada e cancelada liberam. */
+const STATUS_ABERTOS = ["enviada", "em_analise", "aceita"] as const;
+
 export async function enviarProposta(entrada: Entrada): Promise<ResultadoProposta> {
   // ------------------------------------------------------------ quem envia
   // "Público" quer dizer que não EXIGE sessão, não que ignore a que existe.
@@ -142,6 +153,16 @@ export async function enviarProposta(entrada: Entrada): Promise<ResultadoPropost
 
   const admin = createAdminClient();
 
+  // ------------------------------------------- uma proposta aberta por CPF
+  // Antes de cadastrar corretor e mandar convite: proposta que não vai entrar
+  // não pode deixar cadastro nem WhatsApp para trás. A garantia de verdade é o
+  // gatilho do banco; isto aqui é a mensagem chegar cedo.
+  const aberta = await cpfComPropostaAberta(admin, comprador.cpf);
+  if (aberta === "erro") {
+    return { ok: false, erro: "Não consegui conferir o CPF do comprador. Tente de novo em instantes." };
+  }
+  if (aberta) return { ok: false, erro: AVISO_PROPOSTA_ABERTA };
+
   // ------------------------------------------------------------- o corretor
   // `convite` só vem preenchido quando o cadastro nasceu agora: é o link de
   // primeiro acesso, disparado depois que a proposta estiver gravada.
@@ -220,9 +241,11 @@ export async function enviarProposta(entrada: Entrada): Promise<ResultadoPropost
     return {
       ok: false,
       erro:
-        error?.code === "23505"
-          ? "Esta unidade acabou de ser negociada. Volte ao simulador e escolha outra."
-          : "Não consegui registrar a proposta. Tente de novo em instantes.",
+        error?.code === "TRL01"
+          ? AVISO_PROPOSTA_ABERTA
+          : error?.code === "23505"
+            ? "Esta unidade acabou de ser negociada. Volte ao simulador e escolha outra."
+            : "Não consegui registrar a proposta. Tente de novo em instantes.",
     };
   }
 
@@ -479,25 +502,74 @@ function traduzirFalhaDeCadastro(error: { code?: string; message?: string } | nu
 
 /**
  * O comprador é uma pessoa só, identificada pelo CPF. Propor duas unidades não
- * cria duas fichas — e os dados de contato são atualizados para os mais
- * recentes, que são os que o corretor acabou de digitar.
+ * cria duas fichas.
+ *
+ * Comprador que JÁ EXISTE não é alterado aqui (decisão de 27/out). Esta é a
+ * rota pública: se ela atualizasse o contato, qualquer um que digitasse um CPF
+ * conhecido trocaria o telefone para onde vão o link de acompanhamento e a
+ * minuta. Corrigir contato de comprador existente é coisa da Trilha, no painel
+ * (a negociação pela Trilha atualiza).
  */
 async function acharOuCriarComprador(admin: Admin, comprador: Comprador): Promise<string | null> {
+  const cpf = digitos(comprador.cpf);
+
+  const existente = await buscarComprador(admin, cpf);
+  if (existente === "erro") return null;
+  if (existente) return existente;
+
   const { data, error } = await admin
     .from("comprador")
-    .upsert(
-      {
-        nome: comprador.nome.trim(),
-        cpf: digitos(comprador.cpf),
-        email: normalizarEmail(comprador.email),
-        telefone: digitos(comprador.telefone),
-      },
-      { onConflict: "cpf" },
-    )
+    .insert({
+      nome: comprador.nome.trim(),
+      cpf,
+      email: normalizarEmail(comprador.email),
+      telefone: digitos(comprador.telefone),
+    })
     .select("id")
     .maybeSingle<{ id: string }>();
 
+  // Dois envios com o mesmo CPF novo ao mesmo tempo: o outro criou primeiro.
+  // Usa o dele, sem sobrescrever nada.
+  if (error?.code === "23505") {
+    const criadoPeloOutro = await buscarComprador(admin, cpf);
+    return criadoPeloOutro === "erro" ? null : criadoPeloOutro;
+  }
   if (error) console.error("[proposta] falha ao registrar comprador:", error);
 
   return data?.id ?? null;
+}
+
+async function buscarComprador(admin: Admin, cpf: string): Promise<string | null | "erro"> {
+  const { data, error } = await admin
+    .from("comprador")
+    .select("id")
+    .eq("cpf", cpf)
+    .maybeSingle<{ id: string }>();
+  if (error) {
+    console.error("[proposta] falha ao procurar comprador:", error);
+    return "erro";
+  }
+  return data?.id ?? null;
+}
+
+/**
+ * O CPF tem proposta enviada, em análise ou aceita? Lê a tabela direto (e não
+ * a função do banco) para funcionar mesmo antes de o SQL novo ser aplicado.
+ */
+async function cpfComPropostaAberta(admin: Admin, cpfDigitado: string): Promise<boolean | "erro"> {
+  const compradorId = await buscarComprador(admin, digitos(cpfDigitado));
+  if (compradorId === "erro") return "erro";
+  if (!compradorId) return false;
+
+  const { data, error } = await admin
+    .from("proposta")
+    .select("id")
+    .eq("comprador_id", compradorId)
+    .in("status", [...STATUS_ABERTOS])
+    .limit(1);
+  if (error) {
+    console.error("[proposta] falha ao conferir proposta aberta:", error);
+    return "erro";
+  }
+  return (data?.length ?? 0) > 0;
 }

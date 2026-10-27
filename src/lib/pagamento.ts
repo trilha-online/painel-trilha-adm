@@ -14,7 +14,12 @@
  * comprador não vê essa divisão — para ele existe uma parcela só.
  */
 
-import { COMISSAO_PADRAO, TAXA_GESTAO_MENSAL, TAXA_REAJUSTE_MENSAL } from "@/lib/trilha";
+import {
+  COMISSAO_PADRAO,
+  GESTAO_MINIMA_MENSAL,
+  TAXA_GESTAO_MENSAL,
+  TAXA_REAJUSTE_MENSAL,
+} from "@/lib/trilha";
 
 export type OpcaoPagamento = {
   ordem: number;
@@ -40,7 +45,7 @@ export type Condicao = {
   /** Quitado no mês seguinte ao fim da Trilha. Não tem desconto de comissão. */
   saldoFinanciar: number;
 
-  /** Gestão da Trilha, igual em todos os meses. */
+  /** Gestão da Trilha, igual em todos os meses: 0,1% da base, mínimo R$ 296. */
   gestao: number;
   /** Parcela cheia do comprador, já com a gestão. Vale da segunda em diante. */
   parcela: number;
@@ -94,7 +99,11 @@ export function calcularCondicao(
   const entrada = emReais(centavos((base * percentual_entrada) / 100));
   const ato = emReais(centavos((base * percentual_ato) / 100));
   const totalNaTrilha = emReais(centavos(entrada) - centavos(ato));
-  const gestao = emReais(centavos(base * TAXA_GESTAO_MENSAL));
+  // O piso entra aqui e em nenhum outro lugar: o banco não recalcula a gestão,
+  // ele lê a que ficou congelada na proposta (`condicao->>'gestao'`).
+  const gestao = emReais(
+    Math.max(centavos(GESTAO_MINIMA_MENSAL), centavos(base * TAXA_GESTAO_MENSAL)),
+  );
 
   // Dividir em centavos, e não em reais, garante que a soma das parcelas dê
   // exatamente o total. A sobra da divisão vai na primeira parcela.

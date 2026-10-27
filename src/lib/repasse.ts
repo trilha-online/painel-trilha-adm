@@ -21,6 +21,7 @@
 
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { ErroAsaas, criarTransferencia, tipoDaChave, type AmbienteAsaas } from "@/lib/asaas";
+import { avisarDonoDoRepasse, ehProblemaDeChave } from "@/lib/chave-pix";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -99,11 +100,19 @@ export async function enviarLote(admin: Admin, loteId: string, ambiente: Ambient
   if (erroChave || !k) return falhar("falhou", "Não encontrei o beneficiário deste lote.");
 
   const nome = k.nome ?? "beneficiário";
-  if (!k.chave) return falhar("falhou", `${nome} não tem chave Pix cadastrada. Cadastre e tente de novo.`, nome);
+  // Problema de chave é o único que o dono resolve: ele também é avisado
+  // (WhatsApp na fila; sai na varredura das 10h).
+  if (!k.chave) {
+    const r = await falhar("falhou", `${nome} não tem chave Pix cadastrada. Cadastre e tente de novo.`, nome);
+    await avisarDonoDoRepasse(admin, loteId, "sem_chave");
+    return r;
+  }
 
   const tipo = tipoDaChave(k.chave, k.tipo);
   if (!tipo) {
-    return falhar("falhou", `A chave Pix de ${nome} ("${k.chave}") está num formato que não reconheço. Corrija no cadastro.`, nome);
+    const r = await falhar("falhou", `A chave Pix de ${nome} ("${k.chave}") está num formato que não reconheço. Corrija no cadastro.`, nome);
+    await avisarDonoDoRepasse(admin, loteId, "formato");
+    return r;
   }
 
   const { count } = await admin
@@ -150,7 +159,10 @@ export async function enviarLote(admin: Admin, loteId: string, ambiente: Ambient
     return { ok: true, transferenciaId: t.id, valor: Number(lote.valor), nome };
   } catch (e) {
     if (e instanceof ErroAsaas && e.status !== undefined && e.status >= 400 && e.status < 500) {
-      return falhar("falhou", e.message, nome);
+      const r = await falhar("falhou", e.message, nome);
+      // Saldo, limite e afins são da Trilha: o dono não é incomodado.
+      if (ehProblemaDeChave(e.message)) await avisarDonoDoRepasse(admin, loteId, "recusada");
+      return r;
     }
     console.error("[repasse] resposta incerta do Asaas:", loteId, e);
     return falhar(

@@ -467,3 +467,78 @@ export const ASSUNTO_DO_MARCO: Record<MarcoAndamento, string> = {
   chaves: "Pagamentos confirmados",
   trilha: "Chaves liberadas",
 };
+
+// ------------------------------------------------------------ chave Pix
+
+/**
+ * O dono é avisado de TODA troca da chave dele, inclusive quando foi ele
+ * mesmo: é o que denuncia um login roubado. A frase muda, o aviso não.
+ */
+export function textoChavePixAlterada({
+  nome,
+  quemTrocou,
+  propria,
+  quando,
+  chaveNova,
+  link,
+}: {
+  nome: string;
+  /** "INC TESTE (incorporadora)", "a equipe da Trilha". Ignorado quando `propria`. */
+  quemTrocou: string;
+  propria: boolean;
+  quando: string;
+  /** Já mascarada. Nulo = a chave foi apagada. */
+  chaveNova: string | null;
+  /** Onde ele mesmo corrige; nulo quando ainda não há tela para ele. */
+  link: string | null;
+}): string {
+  return [
+    `Olá, ${primeiro(nome)}. A sua chave Pix de recebimento na Trilha foi alterada${
+      propria ? "" : ` por ${quemTrocou}`
+    } em ${quando}.`,
+    "",
+    chaveNova ? `*Nova chave:* ${chaveNova}` : "*A chave foi removida.* Sem chave, não conseguimos fazer os seus repasses.",
+    "",
+    propria
+      ? "Se foi você, está tudo certo. Se não foi, fale com a equipe da Trilha agora."
+      : "Se você não pediu essa troca, fale com a equipe da Trilha agora: os próximos repasses vão para esta chave.",
+    ...(link ? ["", "Seus dados no painel:", link] : []),
+  ].join("\n");
+}
+
+export type MotivoChaveRecusada = "sem_chave" | "formato" | "recusada";
+
+/** Repasse que não saiu por causa da chave — o único caso em que o dono pode resolver. */
+export function textoRepasseChaveRecusada({
+  nome,
+  valor,
+  referencia,
+  motivo,
+  chave,
+  link,
+}: {
+  nome: string;
+  /** Já formatado: "R$ 2.201,13". */
+  valor: string;
+  /** "10/2026" */
+  referencia: string;
+  motivo: MotivoChaveRecusada;
+  /** Já mascarada. */
+  chave: string | null;
+  link: string | null;
+}): string {
+  const porque =
+    motivo === "sem_chave"
+      ? "não há chave Pix cadastrada para você."
+      : motivo === "formato"
+        ? `a chave cadastrada (${chave ?? "—"}) está num formato que não conseguimos usar.`
+        : `o banco não aceitou a chave cadastrada (${chave ?? "—"}).`;
+  return [
+    `Olá, ${primeiro(nome)}. Não conseguimos enviar o seu repasse de ${valor} (referência ${referencia}): ${porque}`,
+    "",
+    link
+      ? "Confira a sua chave Pix no painel e fale com a equipe da Trilha para enviarmos de novo:"
+      : "Fale com a equipe da Trilha para corrigir a chave e enviarmos de novo.",
+    ...(link ? [link] : []),
+  ].join("\n");
+}

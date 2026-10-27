@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { avisarTrocasEDespachar } from "@/lib/chave-pix";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acessoSchema, incorporadoraEdicaoSchema, incorporadoraSchema } from "@/lib/schemas";
@@ -180,6 +182,9 @@ export async function atualizarIncorporadora(id: string, bruto: unknown): Promis
     };
   }
 
+  // A troca de chave (se houve) já está no histórico, pelo gatilho do banco;
+  // o WhatsApp ao dono sai depois da resposta.
+  after(() => avisarTrocasEDespachar(createAdminClient()));
   revalidatePath("/incorporadoras");
   revalidatePath(`/incorporadoras/${id}`);
   return { id, erro: null };
@@ -289,6 +294,9 @@ export async function atualizarPerfil(bruto: unknown): Promise<Resultado> {
     };
   }
 
+  // A troca de chave (se houve) já está no histórico, pelo gatilho do banco;
+  // o WhatsApp ao dono sai depois da resposta.
+  after(() => avisarTrocasEDespachar(createAdminClient()));
   revalidatePath("/perfil");
   return { id: sessao.incorporadoraId, erro: null };
 }

@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { avisarTrocasEDespachar } from "@/lib/chave-pix";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -215,6 +217,9 @@ export async function atualizarParceiro(id: string, bruto: unknown): Promise<Res
   revalidatePath(`/incorporadoras/${data.incorporadora_id}/parceiros`);
   revalidatePath("/parceiros");
   revalidatePath("/parceiro-trilha");
+  // A troca de chave (se houve) já está no histórico, pelo gatilho do banco;
+  // o WhatsApp ao dono sai depois da resposta.
+  after(() => avisarTrocasEDespachar(createAdminClient()));
   return { id: data.id, erro: null };
 }
 

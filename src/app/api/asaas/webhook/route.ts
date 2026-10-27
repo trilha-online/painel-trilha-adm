@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { avisarDonoDoRepasse, ehProblemaDeChave } from "@/lib/chave-pix";
+import { despachar } from "@/lib/avisos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { criarAviso } from "@/lib/avisos";
 import { formatBRL } from "@/lib/br";
@@ -104,9 +106,9 @@ async function avisarNoSino(admin: Admin, resultado: string, evento: EventoAsaas
     if (resultado === "transferencia_situacao") return;
     const { data: lote } = await admin
       .from("repasse_lote")
-      .select("nome_beneficiario, valor")
+      .select("id, nome_beneficiario, valor")
       .eq("asaas_transferencia_id", evento.transfer?.id ?? "")
-      .maybeSingle<{ nome_beneficiario: string | null; valor: number }>();
+      .maybeSingle<{ id: string; nome_beneficiario: string | null; valor: number }>();
     const quem = `${lote?.nome_beneficiario ?? "beneficiário"} · ${formatBRL(Number(lote?.valor ?? evento.transfer?.value ?? 0))}`;
     const falhou = resultado === "transferencia_falhou";
     await criarAviso(admin, {
@@ -117,6 +119,12 @@ async function avisarNoSino(admin: Admin, resultado: string, evento: EventoAsaas
       texto: falhou ? (evento.transfer?.failReason ?? "Corrigir e tentar de novo em Repasses.") : undefined,
       link: falhou ? "/repasses?aba=problema" : "/repasses?aba=concluidos",
     });
+    // O banco recusou depois de aceitar o pedido (chave que não existe, por
+    // exemplo): se foi a chave, o dono também fica sabendo.
+    if (falhou && lote && ehProblemaDeChave(evento.transfer?.failReason)) {
+      const ids = await avisarDonoDoRepasse(admin, lote.id, "recusada");
+      if (ids.length) after(() => despachar(admin, ids));
+    }
     return;
   }
 

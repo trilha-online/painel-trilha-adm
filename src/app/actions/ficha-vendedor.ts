@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { avisarTrocasEDespachar } from "@/lib/chave-pix";
 import { getSessao } from "@/lib/sessao";
 import { conferirAndamento } from "@/lib/andamento";
 import { fichaVendedorSchema, type FichaVendedorValues } from "@/lib/schemas";
@@ -120,6 +123,9 @@ export async function salvarFichaVendedor(
   }
 
   await conferirAndamento(negocioId);
+  // A troca de chave (se houve) já está no histórico, pelo gatilho do banco;
+  // o WhatsApp ao dono sai depois da resposta.
+  after(() => avisarTrocasEDespachar(createAdminClient()));
   revalidatePath(`/negocios/${negocioId}`);
   return { ok: true };
 }

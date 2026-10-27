@@ -1,0 +1,11 @@
+import fs from "node:fs";
+import { createClient } from "@supabase/supabase-js";
+const env = Object.fromEntries(fs.readFileSync(".env.local","utf8").split(/\r?\n/).filter(l=>/^[A-Z_]+=/.test(l)).map(l=>{const i=l.indexOf("=");return [l.slice(0,i), l.slice(i+1).replace(/^["']|["']$/g,"").replace(/\\\$/g,"$")]}));
+const s = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const tr = await s.from("chave_pix_alteracao").select("created_at, dono_tipo, parceiro_id, alterado_por_papel, dono_avisado_em").order("created_at",{ascending:false}).limit(4);
+console.log("TROCAS", tr.error?.message ?? JSON.stringify(tr.data, null, 1));
+const p = await s.from("parceiro").select("id, nome, telefone, conta_id, incorporadora_id").ilike("nome","%corbelini%");
+console.log("PARCEIRO", p.error?.message ?? JSON.stringify(p.data?.map(x=>({...x, telefone: x.telefone ? x.telefone.replace(/\d(?=\d{4})/g,"•") : null}))));
+const m = await s.from("mensagem").select("created_at, chave, status, erro, tentativas").like("chave","pix-%").order("created_at",{ascending:false}).limit(5);
+console.log("MENSAGENS", m.error?.message ?? JSON.stringify(m.data));
+console.log("SITE_URL definido:", Boolean(env.SITE_URL), "| UAZAPI definido:", Boolean(env.UAZAPI_URL && env.UAZAPI_TOKEN));

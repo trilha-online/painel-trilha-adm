@@ -3,6 +3,8 @@ import { getSessao, podeEditar } from "@/lib/sessao";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import FormImovel from "@/components/form-imovel";
+import { ExcluirRegistro } from "@/components/excluir-registro";
+import { excluirImovel } from "@/app/actions/imoveis";
 import type { ImovelFormValues } from "@/lib/schemas";
 
 type Registro = {
@@ -67,33 +69,44 @@ export default async function EditarImovelPage({
         descricao={data.empreendimento?.nome}
         voltar={{ href: `/empreendimentos/${id}`, label: data.empreendimento?.nome ?? "Voltar" }}
       />
-      <FormImovel
-        modo="editar"
-        id={imovelId}
-        empreendimentoId={id}
-        voltarPara={`/empreendimentos/${id}/imoveis/${imovelId}`}
-        inicial={{
-          empreendimento_id: data.empreendimento_id,
-          identificacao: data.identificacao,
-          tipologia: data.tipologia ?? "",
-          observacao: data.observacao ?? "",
-          numero_matricula: data.numero_matricula ?? "",
-          tipo: data.tipo,
-          status: data.status,
-          valor: decimalParaTexto(data.valor),
-          metros_quadrados: decimalParaTexto(data.metros_quadrados),
-          area_total: decimalParaTexto(data.area_total),
-          area_garden: decimalParaTexto(data.area_garden),
-          posicao_solar: data.posicao_solar ?? "",
-          num_quartos: inteiroParaTexto(data.num_quartos),
-          num_suites: inteiroParaTexto(data.num_suites),
-          num_banheiros: inteiroParaTexto(data.num_banheiros),
-          num_vagas: inteiroParaTexto(data.num_vagas),
-          matricula_vaga: data.matricula_vaga ?? "",
-          sacada: data.sacada,
-          churrasqueira: data.churrasqueira,
-        }}
-      />
+      <div className="flex flex-col gap-8">
+        <FormImovel
+          modo="editar"
+          id={imovelId}
+          empreendimentoId={id}
+          voltarPara={`/empreendimentos/${id}/imoveis/${imovelId}`}
+          inicial={{
+            empreendimento_id: data.empreendimento_id,
+            identificacao: data.identificacao,
+            tipologia: data.tipologia ?? "",
+            observacao: data.observacao ?? "",
+            numero_matricula: data.numero_matricula ?? "",
+            tipo: data.tipo,
+            status: data.status,
+            valor: decimalParaTexto(data.valor),
+            metros_quadrados: decimalParaTexto(data.metros_quadrados),
+            area_total: decimalParaTexto(data.area_total),
+            area_garden: decimalParaTexto(data.area_garden),
+            posicao_solar: data.posicao_solar ?? "",
+            num_quartos: inteiroParaTexto(data.num_quartos),
+            num_suites: inteiroParaTexto(data.num_suites),
+            num_banheiros: inteiroParaTexto(data.num_banheiros),
+            num_vagas: inteiroParaTexto(data.num_vagas),
+            matricula_vaga: data.matricula_vaga ?? "",
+            sacada: data.sacada,
+            churrasqueira: data.churrasqueira,
+          }}
+        />
+
+        <ExcluirRegistro
+          titulo="Excluir unidade"
+          nome={data.identificacao}
+          alternativa="Se a unidade existe mas saiu do ar, mude o status para indisponível em vez de excluir: ela some do simulador e do painel do corretor, e o cadastro fica."
+          rotulo="Excluir unidade"
+          acao={excluirImovel.bind(null, imovelId)}
+          voltarPara={`/empreendimentos/${id}`}
+        />
+      </div>
     </>
   );
 }

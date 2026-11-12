@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessao, podeEditar } from "@/lib/sessao";
 import { PageHeader } from "@/components/ui";
 import FormEmpreendimento from "@/components/form-empreendimento";
+import { ExcluirRegistro } from "@/components/excluir-registro";
+import { excluirEmpreendimento } from "@/app/actions/empreendimentos";
 
 type Registro = { id: string; nome: string; endereco: string | null; incorporadora_id: string };
 
@@ -26,6 +28,13 @@ export default async function EditarEmpreendimentoPage({
 
   if (!data) notFound();
 
+  // Quantas unidades somem junto. A pessoa precisa ver esse número ANTES de
+  // confirmar: o `on delete cascade` do banco não avisa ninguém.
+  const { count: unidades } = await supabase
+    .from("imovel")
+    .select("id", { count: "exact", head: true })
+    .eq("empreendimento_id", id);
+
   const { data: incorporadoras } = await supabase
     .from("incorporadora")
     .select("id, nome")
@@ -41,17 +50,35 @@ export default async function EditarEmpreendimentoPage({
         descricao={data.nome}
         voltar={{ href: "/empreendimentos", label: "Empreendimentos" }}
       />
-      <FormEmpreendimento
-        modo="editar"
-        id={id}
-        incorporadoras={incorporadoras ?? []}
-        admin={admin}
-        inicial={{
-          incorporadora_id: data.incorporadora_id,
-          nome: data.nome,
-          endereco: data.endereco ?? "",
-        }}
-      />
+      <div className="flex flex-col gap-8">
+        <FormEmpreendimento
+          modo="editar"
+          id={id}
+          incorporadoras={incorporadoras ?? []}
+          admin={admin}
+          inicial={{
+            incorporadora_id: data.incorporadora_id,
+            nome: data.nome,
+            endereco: data.endereco ?? "",
+          }}
+        />
+
+        <ExcluirRegistro
+          titulo="Excluir empreendimento"
+          nome={data.nome}
+          arrasta={
+            unidades
+              ? unidades === 1
+                ? "a unidade cadastrada nele"
+                : `as ${unidades} unidades cadastradas nele`
+              : undefined
+          }
+          alternativa="Se a ideia é tirar do ar sem perder nada, marque as unidades como indisponíveis — elas somem do simulador e do painel do corretor, e o histórico fica."
+          rotulo="Excluir empreendimento"
+          acao={excluirEmpreendimento.bind(null, id)}
+          voltarPara="/empreendimentos"
+        />
+      </div>
     </>
   );
 }

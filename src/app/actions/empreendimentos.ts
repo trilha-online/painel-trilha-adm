@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { empreendimentoSchema } from "@/lib/schemas";
-import { ehAdmin, getSessao } from "@/lib/sessao";
+import { ehAdmin, getSessao, podeEditar } from "@/lib/sessao";
 
 export type Resultado = { id: string; erro: null } | { id: null; erro: string };
 
@@ -79,4 +79,104 @@ export async function atualizarEmpreendimento(id: string, bruto: unknown): Promi
   revalidatePath("/empreendimentos");
   revalidatePath("/empreendimentos");
   return { id, erro: null };
+}
+
+// -------------------------------------------------------------- excluir
+
+/**
+ * Apagar um empreendimento.
+ *
+ * O banco já define o que isso significa, e as regras estão certas:
+ *
+ * - as UNIDADES e as CONDIÇÕES de pagamento dele vão junto (`on delete
+ *   cascade`) — por isso a tela avisa quantas unidades somem antes de
+ *   perguntar;
+ * - mas `proposta` e `negocio` apontam para empreendimento e para imóvel com
+ *   `on delete restrict`. Ou seja: empreendimento que já teve proposta NÃO é
+ *   apagável, e não há nada que a tela possa fazer para mudar isso.
+ *
+ * Essa é a garantia que torna este botão seguro de existir: ele só funciona
+ * no caso que ele deveria resolver — cadastro feito errado, que nunca chegou
+ * a produzir nada.
+ *
+ * A conferência de "dá para apagar" NÃO é feita antes: entre a pergunta e o
+ * apagar cabe uma proposta chegando. Quem decide é o banco, e a consulta que
+ * explica o porquê só roda quando ele recusa.
+ */
+export async function excluirEmpreendimento(id: string): Promise<Resultado> {
+  const sessao = await getSessao();
+  if (!sessao?.conta) return { id: null, erro: "Sessão expirada. Entre de novo." };
+  if (!podeEditar(sessao)) {
+    return { id: null, erro: "Você não tem permissão para excluir empreendimentos." };
+  }
+
+  const supabase = await createClient();
+
+  // `.select()` não é enfeite: DELETE barrado por RLS devolve ZERO linha e
+  // NENHUM erro. Sem conferir o que voltou, a tela diria "excluído" para uma
+  // operação que não aconteceu.
+  const { data, error } = await supabase
+    .from("empreendimento")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    if (error.code === "23503") {
+      return { id: null, erro: await porQueNaoDaParaExcluir(id) };
+    }
+    if (error.code === "42501") {
+      return { id: null, erro: "Você não tem permissão para excluir este empreendimento." };
+    }
+    return { id: null, erro: detalhar("Não foi possível excluir o empreendimento.", error) };
+  }
+
+  if (!data) {
+    return {
+      id: null,
+      erro: "Este empreendimento não existe mais, ou não é de uma incorporadora que você administra.",
+    };
+  }
+
+  revalidatePath("/empreendimentos");
+  revalidatePath("/imoveis");
+  return { id, erro: null };
+}
+
+/**
+ * A frase que explica a recusa do banco.
+ *
+ * O erro cru do Postgres diz o nome da constraint e o nome da tabela, o que
+ * não ajuda ninguém. Aqui a gente conta o que de fato existe preso ao
+ * empreendimento, porque é isso que diz à pessoa o que fazer a seguir.
+ */
+async function porQueNaoDaParaExcluir(id: string): Promise<string> {
+  const supabase = await createClient();
+
+  const [propostas, negocios] = await Promise.all([
+    supabase
+      .from("proposta")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", id),
+    supabase
+      .from("negocio")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", id),
+  ]);
+
+  const partes: string[] = [];
+  if (propostas.count) {
+    partes.push(propostas.count === 1 ? "1 proposta" : `${propostas.count} propostas`);
+  }
+  if (negocios.count) {
+    partes.push(negocios.count === 1 ? "1 negócio" : `${negocios.count} negócios`);
+  }
+
+  if (partes.length === 0) {
+    // A contagem pode voltar vazia por RLS. Não invente certeza que não há.
+    return "Este empreendimento tem histórico preso a ele e não pode ser excluído. Marque as unidades como indisponíveis para tirá-las do ar.";
+  }
+
+  return `Não dá para excluir: este empreendimento já tem ${partes.join(" e ")}. Apagar levaria o histórico junto. Para tirá-lo do ar, marque as unidades como indisponíveis.`;
 }

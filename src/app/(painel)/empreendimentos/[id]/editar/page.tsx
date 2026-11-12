@@ -4,9 +4,16 @@ import { getSessao, podeEditar } from "@/lib/sessao";
 import { PageHeader } from "@/components/ui";
 import FormEmpreendimento from "@/components/form-empreendimento";
 import { ExcluirRegistro } from "@/components/excluir-registro";
+import { AtivarEmpreendimento } from "@/components/ativar-empreendimento";
 import { excluirEmpreendimento } from "@/app/actions/empreendimentos";
 
-type Registro = { id: string; nome: string; endereco: string | null; incorporadora_id: string };
+type Registro = {
+  id: string;
+  nome: string;
+  endereco: string | null;
+  incorporadora_id: string;
+  ativo: boolean;
+};
 
 export default async function EditarEmpreendimentoPage({
   params,
@@ -22,7 +29,7 @@ export default async function EditarEmpreendimentoPage({
 
   const { data } = await supabase
     .from("empreendimento")
-    .select("id, nome, endereco, incorporadora_id")
+    .select("id, nome, endereco, incorporadora_id, ativo")
     .eq("id", id)
     .maybeSingle<Registro>();
 
@@ -30,10 +37,14 @@ export default async function EditarEmpreendimentoPage({
 
   // Quantas unidades somem junto. A pessoa precisa ver esse número ANTES de
   // confirmar: o `on delete cascade` do banco não avisa ninguém.
-  const { count: unidades } = await supabase
-    .from("imovel")
-    .select("id", { count: "exact", head: true })
-    .eq("empreendimento_id", id);
+  const [{ count: unidades }, { count: disponiveis }] = await Promise.all([
+    supabase.from("imovel").select("id", { count: "exact", head: true }).eq("empreendimento_id", id),
+    supabase
+      .from("imovel")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", id)
+      .eq("status", "disponivel"),
+  ]);
 
   const { data: incorporadoras } = await supabase
     .from("incorporadora")
@@ -63,6 +74,13 @@ export default async function EditarEmpreendimentoPage({
           }}
         />
 
+        <AtivarEmpreendimento
+          id={id}
+          nome={data.nome}
+          ativo={data.ativo}
+          unidadesDisponiveis={disponiveis ?? 0}
+        />
+
         <ExcluirRegistro
           titulo="Excluir empreendimento"
           nome={data.nome}
@@ -73,7 +91,7 @@ export default async function EditarEmpreendimentoPage({
                 : `as ${unidades} unidades cadastradas nele`
               : undefined
           }
-          alternativa="Se a ideia é tirar do ar sem perder nada, marque as unidades como indisponíveis — elas somem do simulador e do painel do corretor, e o histórico fica."
+          alternativa="Excluir é para cadastro que não deveria existir — importação que não vai ser usada, prédio cadastrado errado. Se o prédio existe mas saiu da plataforma, use Tirar do ar, logo acima: some da vitrine e nada se perde."
           rotulo="Excluir empreendimento"
           acao={excluirEmpreendimento.bind(null, id)}
           voltarPara="/empreendimentos"

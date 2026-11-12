@@ -10,11 +10,26 @@ import { Busca } from "@/components/busca";
 type Linha = {
   id: string;
   nome: string;
+  ativo: boolean;
   endereco: string | null;
   incorporadora_id: string;
   incorporadora: { nome: string } | null;
   imovel: { count: number }[];
 };
+
+/**
+ * A SEGUNDA LISTA, em forma de filtro.
+ *
+ * Só a Trilha vê empreendimento indisponível — para todo o resto ele nem
+ * existe, e a policy do banco cuida disso. Então os chips aparecem só para o
+ * admin, e a lista abre em "No ar": o trabalho do dia é com o que está
+ * vendendo, não com o que foi guardado.
+ */
+const FILTROS = [
+  { chave: "ativos", label: "No ar" },
+  { chave: "indisponiveis", label: "Indisponíveis" },
+  { chave: "todos", label: "Todos" },
+] as const;
 
 /** PostgREST separa condições do `or` por vírgula — então ela não pode passar. */
 const limpar = (termo: string) => termo.replace(/[,()*]/g, " ").trim();
@@ -22,9 +37,9 @@ const limpar = (termo: string) => termo.replace(/[,()*]/g, " ").trim();
 export default async function EmpreendimentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ incorporadora?: string; q?: string }>;
+  searchParams: Promise<{ incorporadora?: string; q?: string; situacao?: string }>;
 }) {
-  const { incorporadora, q } = await searchParams;
+  const { incorporadora, q, situacao } = await searchParams;
   const termo = limpar(q ?? "");
   const sessao = await getSessao();
   // Várias telas mandam o corretor para cá. O Parceiro Trilha não tem uma
@@ -33,6 +48,9 @@ export default async function EmpreendimentosPage({
   if (ehProprietarioPF(sessao)) redirect(`/proprietarios/${sessao!.incorporadoraId}`);
   const admin = sessao?.conta?.tipo === "trilha_admin";
   const edita = podeEditar(sessao);
+  // Para quem não é admin o filtro não existe: o banco já só devolve os que
+  // estão no ar, e um chip que não muda nada é pior do que chip nenhum.
+  const filtro = admin && FILTROS.some((f) => f.chave === situacao) ? situacao! : "ativos";
 
   const supabase = await createClient();
 
@@ -46,12 +64,14 @@ export default async function EmpreendimentosPage({
 
   let consulta = supabase
     .from("empreendimento")
-    .select("id, nome, endereco, incorporadora_id, incorporadora!inner(nome), imovel(count)")
+    .select("id, nome, ativo, endereco, incorporadora_id, incorporadora!inner(nome), imovel(count)")
     // Os imóveis avulsos (proprietário PF) aparecem no menu próprio.
     .eq("incorporadora.tipo", "incorporadora")
     .order("nome");
 
   if (incorporadora) consulta = consulta.eq("incorporadora_id", incorporadora);
+  if (filtro === "ativos") consulta = consulta.eq("ativo", true);
+  if (filtro === "indisponiveis") consulta = consulta.eq("ativo", false);
 
   if (termo) {
     // Nome do empreendimento ou endereço.
@@ -68,6 +88,8 @@ export default async function EmpreendimentosPage({
     .select("id, incorporadora!inner(tipo)")
     .eq("incorporadora.tipo", "incorporadora");
   if (incorporadora) escopo = escopo.eq("incorporadora_id", incorporadora);
+  if (filtro === "ativos") escopo = escopo.eq("ativo", true);
+  if (filtro === "indisponiveis") escopo = escopo.eq("ativo", false);
   const { data: doEscopo } = await escopo.returns<{ id: string }[]>();
   const idsEscopo = (doEscopo ?? []).map((e) => e.id);
 
@@ -139,13 +161,41 @@ export default async function EmpreendimentosPage({
           </Suspense>
         ) : null}
 
+        {admin ? (
+          <div className="flex flex-wrap gap-1.5">
+            {FILTROS.map((f) => {
+              const on = f.chave === filtro;
+              const destino = new URLSearchParams();
+              if (f.chave !== "ativos") destino.set("situacao", f.chave);
+              if (incorporadora) destino.set("incorporadora", incorporadora);
+              if (termo) destino.set("q", termo);
+              const qs = destino.toString();
+
+              return (
+                <Link
+                  key={f.chave}
+                  href={qs ? `/empreendimentos?${qs}` : "/empreendimentos"}
+                  aria-current={on ? "page" : undefined}
+                  className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                    on
+                      ? "border-foreground/20 bg-muted font-medium text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {f.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+
         {buscando ? (
           <span className="text-sm text-muted-foreground">
             {data?.length ?? 0} resultado{(data?.length ?? 0) === 1 ? "" : "s"} para “{termo}”
           </span>
         ) : null}
 
-        {filtrando || buscando ? (
+        {filtrando || buscando || filtro !== "ativos" ? (
           <Link
             href="/empreendimentos"
             className="text-sm font-semibold text-foreground underline-offset-4 hover:underline hover:text-foreground"
@@ -166,14 +216,18 @@ export default async function EmpreendimentosPage({
           titulo={
             buscando
               ? "Nenhum empreendimento encontrado"
-              : filtrando
-                ? "Nenhum empreendimento desta incorporadora"
-                : "Nenhum empreendimento cadastrado"
+              : filtro === "indisponiveis"
+                ? "Nenhum empreendimento fora do ar"
+                : filtrando
+                  ? "Nenhum empreendimento desta incorporadora"
+                  : "Nenhum empreendimento cadastrado"
           }
           texto={
             buscando
               ? `Nada corresponde a “${termo}”. Tente parte do nome ou do endereço.`
-              : "Cadastre o prédio ou condomínio antes de incluir as unidades."
+              : filtro === "indisponiveis"
+                ? "Tudo que está cadastrado está no ar. Empreendimento tirado do ar aparece aqui, guardado e pronto para voltar."
+                : "Cadastre o prédio ou condomínio antes de incluir as unidades."
           }
           acao={edita ? { href: "/empreendimentos/novo", label: "Cadastrar empreendimento" } : undefined}
         />
@@ -208,6 +262,11 @@ export default async function EmpreendimentosPage({
                     >
                       {linha.nome}
                     </Link>
+                    {linha.ativo ? null : (
+                      <span className="block text-sm text-muted-foreground">
+                        indisponível · fora do simulador
+                      </span>
+                    )}
                   </td>
                   {admin ? (
                     <td className="px-4 py-3 text-sm">

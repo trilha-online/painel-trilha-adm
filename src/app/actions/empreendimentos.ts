@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { empreendimentoSchema } from "@/lib/schemas";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ehAdmin, getSessao, podeEditar } from "@/lib/sessao";
 
 export type Resultado = { id: string; erro: null } | { id: null; erro: string };
@@ -189,4 +190,68 @@ async function porQueNaoDaParaExcluir(id: string): Promise<string> {
   }
 
   return `Não dá para excluir: este empreendimento já tem ${partes.join(" e ")}. Apagar levaria o histórico junto. Para tirá-lo do ar, marque as unidades como indisponíveis.`;
+}
+
+// --------------------------------------------- disponível / indisponível
+
+/**
+ * Tirar um empreendimento do ar, ou devolvê-lo.
+ *
+ * É o caminho REVERSÍVEL, e é o que resolve quase todos os casos reais:
+ * parceria suspensa, prédio que saiu da plataforma, estoque que a
+ * incorporadora resolveu vender por outro caminho. Excluir continua
+ * existindo, mas só faz sentido para cadastro que nunca deveria ter nascido.
+ *
+ * Indisponível some do simulador, do painel do corretor e do painel do
+ * próprio vendedor — quem decide isso é a Trilha, e só a Trilha enxerga.
+ * Nada é apagado: as unidades, as condições e o histórico ficam onde estão.
+ *
+ * Escreve pela chave de servidor porque a policy do vendedor agora exige o
+ * empreendimento ATIVO: pela sessão, religar um empreendimento desligado
+ * seria barrado pela própria regra que o desligou. E porque isto é ato de
+ * admin por definição.
+ */
+export async function definirAtivoEmpreendimento(id: string, ativo: boolean): Promise<Resultado> {
+  const sessao = await getSessao();
+  if (!sessao?.conta) return { id: null, erro: "Sessão expirada. Entre de novo." };
+  if (!ehAdmin(sessao)) {
+    return {
+      id: null,
+      erro: "Só um administrador da Trilha pode tirar um empreendimento do ar ou devolvê-lo.",
+    };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      id: null,
+      erro: "A chave de administrador do Supabase não está configurada no .env.local.",
+    };
+  }
+
+  const { data, error } = await admin
+    .from("empreendimento")
+    .update({ ativo })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error || !data) {
+    return {
+      id: null,
+      erro: detalhar(
+        ativo
+          ? "Não foi possível devolver o empreendimento ao ar."
+          : "Não foi possível tirar o empreendimento do ar.",
+        error,
+      ),
+    };
+  }
+
+  revalidatePath("/empreendimentos");
+  revalidatePath(`/empreendimentos/${id}`);
+  revalidatePath("/imoveis");
+  return { id, erro: null };
 }

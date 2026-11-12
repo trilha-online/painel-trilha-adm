@@ -28,6 +28,7 @@ export type EmpreendimentoSimulavel = {
 type LinhaEmpreendimento = {
   id: string;
   nome: string;
+  ativo: boolean;
   incorporadora_id: string;
   incorporadora: { nome: string; tipo: string; ativo: boolean } | null;
 };
@@ -67,7 +68,7 @@ async function listarEmpreendimentos(incluirAvulsos: boolean): Promise<Empreendi
   const [{ data: empreendimentos }, { data: unidades }, { data: opcoes }] = await Promise.all([
     supabase
       .from("empreendimento")
-      .select("id, nome, incorporadora_id, incorporadora (nome, tipo, ativo)")
+      .select("id, nome, ativo, incorporadora_id, incorporadora (nome, tipo, ativo)")
       .order("nome")
       .returns<LinhaEmpreendimento[]>(),
 
@@ -96,11 +97,12 @@ async function listarEmpreendimentos(incluirAvulsos: boolean): Promise<Empreendi
 
   return (empreendimentos ?? [])
     .filter((e) => {
-      // Vendedor desativado some do ar inteiro: simulador, `/condicoes` e
-      // nova negociação. Esta leitura usa a chave de servidor, que ignora RLS
-      // — então o recorte do vendedor precisa estar escrito aqui, à mão. É o
-      // preço de ler sem identidade, e a razão de toda leitura pública morar
-      // neste arquivo só.
+      // Duas chaves, e as duas desligam: o empreendimento tirado do ar à mão
+      // pela Trilha, e o vendedor desativado. Esta leitura usa a chave de
+      // servidor, que ignora RLS — então o recorte precisa estar escrito aqui,
+      // à mão. É o preço de ler sem identidade, e a razão de toda leitura
+      // pública morar neste arquivo só.
+      if (!e.ativo) return false;
       if (!e.incorporadora?.ativo) return false;
       if (!comEstoque.has(e.id)) return false;
       // Imóvel avulso nunca vai ao público; no admin entra mesmo sem opções.
@@ -173,6 +175,7 @@ type LinhaImovel = UnidadeSimulavel & {
   empreendimento: {
     id: string;
     nome: string;
+    ativo: boolean;
     incorporadora_id: string;
     incorporadora: {
       nome: string;
@@ -207,7 +210,7 @@ export async function simular(
     .from("imovel")
     .select(
       `${CAMPOS_UNIDADE}, valor,
-       empreendimento (id, nome, incorporadora_id, incorporadora (nome, percentual_comissao, tipo, ativo))`,
+       empreendimento (id, nome, ativo, incorporadora_id, incorporadora (nome, percentual_comissao, tipo, ativo))`,
     )
     .eq("id", imovelId)
     .eq("empreendimento_id", empreendimentoId)
@@ -218,10 +221,11 @@ export async function simular(
   const empreendimento = data?.empreendimento;
   if (!data || !empreendimento) return null;
 
-  // A mesma trava da lista, de novo aqui: `/condicoes` e o ENVIO da proposta
-  // chamam `simular` direto, sem passar pela lista. Sem esta linha, um link
-  // antigo continuaria simulando — e aceitando proposta — do estoque de um
-  // vendedor que já saiu do ar.
+  // As mesmas travas da lista, de novo aqui: `/condicoes` e o ENVIO da
+  // proposta chamam `simular` direto, sem passar pela lista. Sem estas linhas,
+  // um link antigo continuaria simulando — e aceitando proposta — de estoque
+  // que já saiu do ar.
+  if (!empreendimento.ativo) return null;
   if (!empreendimento.incorporadora?.ativo) return null;
 
   const avulso = ehAvulso(empreendimento.incorporadora?.tipo);

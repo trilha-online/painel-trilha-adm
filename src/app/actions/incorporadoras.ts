@@ -279,10 +279,16 @@ export async function atualizarPerfil(bruto: unknown): Promise<Resultado> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  // Pela sessão, de propósito: a policy `incorporadora_propria_edicao` exige
+  // `conta_id = auth.uid()` E o cadastro ativo. É o banco que recusa o
+  // vendedor desativado, não esta função — e `.select()` é o que faz a recusa
+  // aparecer, já que ela chega como zero linha sem erro.
+  const { data, error } = await supabase
     .from("incorporadora")
     .update(montarCamposCadastrais(parsed.data))
-    .eq("id", sessao.incorporadoraId);
+    .eq("id", sessao.incorporadoraId)
+    .select("id")
+    .maybeSingle<{ id: string }>();
 
   if (error) {
     const cnpjRepetido = error.code === "23505";
@@ -291,6 +297,13 @@ export async function atualizarPerfil(bruto: unknown): Promise<Resultado> {
       erro: cnpjRepetido
         ? "Já existe outra incorporadora cadastrada com esse CNPJ."
         : detalhar("Não foi possível salvar as alterações.", error),
+    };
+  }
+
+  if (!data) {
+    return {
+      id: null,
+      erro: "Nada foi salvo. Se o seu cadastro foi desativado pela Trilha, ele fica somente leitura — fale com a Trilha.",
     };
   }
 

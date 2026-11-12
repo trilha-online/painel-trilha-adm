@@ -93,7 +93,14 @@ export async function atualizarImovel(id: string, bruto: unknown): Promise<Resul
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("imovel").update(montarCampos(parsed.data)).eq("id", id);
+  // `.select()` pelo mesmo motivo de sempre: UPDATE barrado por RLS não é
+  // erro, é zero linha em silêncio.
+  const { data, error } = await supabase
+    .from("imovel")
+    .update(montarCampos(parsed.data))
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
 
   if (error) {
     if (error.code === "23505") {
@@ -106,6 +113,13 @@ export async function atualizarImovel(id: string, bruto: unknown): Promise<Resul
       return { id: null, erro: "Você não tem permissão para editar esse imóvel." };
     }
     return { id: null, erro: detalhar("Não foi possível salvar as alterações.", error) };
+  }
+
+  if (!data) {
+    return {
+      id: null,
+      erro: "Nada foi salvo: esta unidade não existe mais, ou não é de um empreendimento que você administra.",
+    };
   }
 
   revalidatePath("/empreendimentos");

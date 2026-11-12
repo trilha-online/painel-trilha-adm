@@ -11,9 +11,12 @@
 -- Rode este arquivo inteiro. Nao altera nenhum dado.
 -- ============================================================================
 
+-- A policy de update do vendedor MORAVA AQUI, com o nome
+-- `incorporadora_atualiza_propria`. Ela foi refeita em `comissao-parceiros.sql`
+-- com o nome `incorporadora_propria_edicao`, e ganhou a exigência de cadastro
+-- ativo em `vendedor-desativado-fecha-tudo.sql`.
+--
+-- Em produção só existe a versão nova. A antiga saiu daqui para o repositório
+-- não criar duas regras iguais com nomes diferentes em quem recriar o projeto
+-- do zero — e para ninguém corrigir uma achando que corrigiu as duas.
 drop policy if exists incorporadora_atualiza_propria on public.incorporadora;
-
-create policy incorporadora_atualiza_propria on public.incorporadora
-  for update to authenticated
-  using (conta_id = auth.uid())
-  with check (conta_id = auth.uid());

@@ -45,7 +45,6 @@ export async function criarEmpreendimento(bruto: unknown): Promise<Resultado> {
   }
 
   revalidatePath("/empreendimentos");
-  revalidatePath("/empreendimentos");
   return { id: data.id, erro: null };
 }
 
@@ -67,16 +66,27 @@ export async function atualizarEmpreendimento(id: string, bruto: unknown): Promi
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  // `.select()` porque UPDATE barrado por RLS devolve ZERO linha e NENHUM
+  // erro: sem conferir o retorno, a tela diria "salvo" para uma escrita que
+  // não aconteceu.
+  const { data, error } = await supabase
     .from("empreendimento")
     .update({ incorporadora_id, nome, endereco: endereco || null })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
 
   if (error) {
     return { id: null, erro: detalhar("Não foi possível salvar as alterações.", error) };
   }
 
-  revalidatePath("/empreendimentos");
+  if (!data) {
+    return {
+      id: null,
+      erro: "Nada foi salvo: este empreendimento não existe mais, ou não é de uma incorporadora que você administra.",
+    };
+  }
+
   revalidatePath("/empreendimentos");
   return { id, erro: null };
 }

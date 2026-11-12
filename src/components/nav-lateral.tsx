@@ -10,6 +10,7 @@ import {
   FileCheck2,
   House,
   KeyRound,
+  LockKeyhole,
   LogOut,
   Route,
   ShieldUser,
@@ -207,6 +208,16 @@ export function NavLateral({
               </SidebarMenuButton>
             </SidebarMenuItem>
           ) : null}
+          {/* Para todo perfil, inclusive o admin e o corretor, que não têm
+              "Meus dados": a senha é da pessoa, não do cadastro. */}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={ativo("/senha")} tooltip="Trocar senha">
+              <Link href="/senha">
+                <LockKeyhole className={ativo("/senha") ? "text-destaque" : "text-muted-foreground"} />
+                <span>Trocar senha</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <form action={signOut}>
               <SidebarMenuButton type="submit" tooltip="Sair">

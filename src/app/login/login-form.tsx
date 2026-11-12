@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { loginSchema } from "@/lib/schemas";
 import { signIn } from "@/app/actions/auth";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { Alert, Button, Field, Input, InputSenha } from "@/components/ui";
 
 type Values = z.infer<typeof loginSchema>;
 
@@ -51,15 +52,22 @@ export default function LoginForm({ voltar }: { voltar?: string }) {
         />
       </Field>
 
-      <Field label="Senha" error={errors.password?.message} span={6}>
-        <Input
-          type="password"
-          autoComplete="current-password"
-          placeholder="••••••••"
-          aria-invalid={!!errors.password}
-          {...register("password")}
-        />
-      </Field>
+      <div className="flex flex-col gap-2">
+        <Field label="Senha" error={errors.password?.message} span={6}>
+          <InputSenha
+            autoComplete="current-password"
+            placeholder="••••••••"
+            aria-invalid={!!errors.password}
+            {...register("password")}
+          />
+        </Field>
+        <Link
+          href="/esqueci-senha"
+          className="self-end text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        >
+          Esqueci minha senha
+        </Link>
+      </div>
 
       {serverError ? <Alert>{serverError}</Alert> : null}
 

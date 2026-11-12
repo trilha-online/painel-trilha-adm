@@ -240,6 +240,32 @@ export function textoConviteParceiro({
   ].join("\n");
 }
 
+// ------------------------------------------------------ senha nova
+
+/**
+ * O link do "Esqueci minha senha". Sai direto pela uazapi, sem passar pela
+ * fila `mensagem`: lá o texto fica gravado e qualquer admin leria um link que
+ * entra na conta de outra pessoa.
+ *
+ * O último parágrafo é o que acalma quem recebeu sem ter pedido: não aconteceu
+ * nada com a senha dele.
+ */
+export function textoRedefinicaoSenha({ nome, link, minutos }: { nome: string; link: string; minutos: number }): string {
+  const primeiroNome = nome.trim().split(/\s+/)[0];
+  const ola = primeiroNome ? `Olá, ${primeiroNome}!` : "Olá!";
+
+  return [
+    `${ola} Recebemos um pedido para criar uma senha nova no painel da Trilha. 🔑`,
+    "",
+    "Crie a sua senha por este link:",
+    link,
+    "",
+    `O link vale por ${minutos} minutos e só pode ser usado uma vez.`,
+    "",
+    "Não foi você que pediu? É só ignorar esta mensagem: a sua senha atual continua valendo.",
+  ].join("\n");
+}
+
 // ------------------------------------------------------ proposta enviada
 
 const primeiro = (nome: string) => nome.trim().split(/\s+/)[0];

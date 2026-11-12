@@ -71,6 +71,7 @@ const SECOES: Record<string, string> = {
   proprietarios: "Proprietários PF",
   "opcoes-pagamento": "Opções de pagamento",
   perfil: "Meus dados",
+  senha: "Trocar senha",
   avisos: "Avisos",
   repasses: "Repasses",
   trilhas: "Trilhas",

@@ -7,9 +7,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // permanente do comprador: quem tem o link entra, sem conta e sem senha.
 // `/api/asaas/webhook` são os avisos do Asaas e `/api/cron` as rotinas que a
 // Vercel dispara — nenhum dos dois tem sessão; cada rota confere o próprio
-// segredo antes de qualquer coisa.
+// segredo antes de qualquer coisa. `/esqueci-senha` e `/redefinir-senha` são
+// de quem não consegue entrar: o link da senha nova é a credencial.
 const PUBLIC_ROUTES = [
   "/login",
+  "/esqueci-senha",
+  "/redefinir-senha",
   "/proposta",
   "/condicoes",
   "/primeiro-acesso",

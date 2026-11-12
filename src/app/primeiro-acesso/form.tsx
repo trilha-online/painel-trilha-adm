@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { definirPrimeiroAcesso } from "@/app/actions/convite";
-import { Alert, Button, Input } from "@/components/ui";
+import { Alert, Button, Field, InputSenha } from "@/components/ui";
 
 /**
  * Definir a senha e entrar.
  *
- * A confirmação existe porque não há "esqueci minha senha" ainda: errar a
- * digitação aqui deixaria o corretor fora, com o convite já queimado.
+ * A confirmação continua mesmo com o "esqueci minha senha" e o olhinho: errar
+ * a digitação aqui queimaria o convite e mandaria o corretor, logo no primeiro
+ * contato, para o caminho da senha esquecida.
  */
 export default function FormPrimeiroAcesso({ token }: { token: string }) {
   const router = useRouter();
@@ -47,30 +48,23 @@ export default function FormPrimeiroAcesso({ token }: { token: string }) {
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-foreground">
-          Crie uma senha
-        </span>
-        <Input
-          type="password"
+      {/* Field, e não <label> em volta do campo: o olhinho é um botão, e
+          botão dentro de <label> é HTML inválido e confunde leitor de tela. */}
+      <Field label="Crie uma senha" span={6} hint="Mínimo de 8 caracteres.">
+        <InputSenha
           autoComplete="new-password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
         />
-        <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</span>
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-foreground">
-          Repita a senha
-        </span>
-        <Input
-          type="password"
+      <Field label="Repita a senha" span={6}>
+        <InputSenha
           autoComplete="new-password"
           value={confirmacao}
           onChange={(e) => setConfirmacao(e.target.value)}
         />
-      </label>
+      </Field>
 
       {erro ? <Alert>{erro}</Alert> : null}
 

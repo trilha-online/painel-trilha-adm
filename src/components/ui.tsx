@@ -1,8 +1,8 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button as BotaoShadcn, buttonVariants } from "@/components/shadcn/button";
 import { Input as InputShadcn } from "@/components/shadcn/input";
@@ -85,6 +85,50 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
     return <InputShadcn ref={ref} className={cn("h-9 bg-card", className)} {...props} />;
   },
 );
+
+/**
+ * Campo de senha com o "olhinho": um clique mostra o que foi digitado, outro
+ * esconde de novo. Começa sempre escondido.
+ *
+ * É para quem digita a PRÓPRIA senha — login, primeiro acesso, redefinir e
+ * trocar senha. Os campos em que a Trilha define a senha de OUTRA pessoa
+ * (ficha de acesso de vendedor, corretor e administrador) continuam em texto
+ * aberto de propósito: quem cadastra precisa ver e anotar o que digitou.
+ *
+ * O botão é `type="button"` para não enviar o formulário. Continua alcançável
+ * pelo Tab, de propósito: quem usa teclado ou leitor de tela também precisa
+ * conseguir conferir o que digitou.
+ */
+export const InputSenha = forwardRef<
+  HTMLInputElement,
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">
+>(function InputSenha({ className, disabled, ...props }, ref) {
+  const [visivel, setVisivel] = useState(false);
+  const rotulo = visivel ? "Esconder senha" : "Mostrar senha";
+
+  return (
+    <div className="relative">
+      <InputShadcn
+        ref={ref}
+        type={visivel ? "text" : "password"}
+        disabled={disabled}
+        className={cn("h-9 bg-card pr-10", className)}
+        {...props}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setVisivel((v) => !v)}
+        aria-label={rotulo}
+        aria-pressed={visivel}
+        title={rotulo}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+      >
+        {visivel ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+      </button>
+    </div>
+  );
+});
 
 /**
  * Lista suspensa nativa, com o visual dos campos da shadcn. A `<select>` do

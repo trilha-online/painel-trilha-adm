@@ -299,7 +299,7 @@ export function textoRecusaCorretor({
     `🏠 *${unidade}* · ${empreendimento}`,
     ...(motivo ? ["", `*Motivo:* ${motivo}`] : []),
     "",
-    "Se fizer sentido, converse com o seu cliente e envie uma nova proposta pelo simulador. Detalhes no painel:",
+    "Se fizer sentido, converse com o seu cliente e envie uma nova proposta. Detalhes no painel:",
     link,
   ].join("\n");
 }

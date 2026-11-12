@@ -2,42 +2,42 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { EmpreendimentoSimulavel } from "@/lib/simulador";
+import type { UnidadeSimulavel } from "@/lib/simulador";
+import { caracteristicas } from "@/lib/unidade";
 
-/** Ignora acentos e maiúsculas: "jardim" acha "Jardím". */
 const normalizar = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
 
-const MAX_RESULTADOS = 20;
+const MAX_RESULTADOS = 30;
 
 /**
- * A escolha do empreendimento.
+ * A escolha da unidade, dentro do empreendimento já selecionado.
  *
- * O campo NUNCA vira um cartão estático depois de escolher: ele continua
- * sendo um campo de busca, com o nome escolhido escrito dentro. Foi o
- * primeiro desenho e estava errado — quem escolhia perdia de vista que
- * aquilo era pesquisável, e o "Trocar" jogava a escolha inteira fora em vez
- * de deixar digitar por cima.
+ * Mesmo desenho da busca de empreendimento, e pelo mesmo motivo: o campo
+ * continua editável depois da escolha, com a unidade escrita dentro. Trocar
+ * de unidade é digitar outra — não existe voltar, porque não se saiu de lugar
+ * nenhum.
  *
- * A lista inteira vem do servidor e o filtro acontece aqui: são poucos
- * empreendimentos e nenhuma tecla precisa ir ao banco. A escolha vai para a
- * URL, não para o estado — é ela que o corretor manda pronto para o cliente.
+ * Sem empreendimento escolhido o campo aparece desativado em vez de sumir:
+ * assim a pessoa vê desde o começo que são dois passos, e qual falta.
  */
-export function BuscaEmpreendimento({
-  empreendimentos,
-  selecionado,
-  base = "/simulador",
+export function BuscaUnidade({
+  empreendimentoId,
+  unidades,
+  selecionada,
+  base = "/proposta",
 }: {
-  empreendimentos: EmpreendimentoSimulavel[];
-  selecionado?: EmpreendimentoSimulavel;
+  empreendimentoId?: string;
+  unidades: UnidadeSimulavel[];
+  selecionada?: UnidadeSimulavel;
   /** Para onde a escolha leva. A "Nova negociação" do painel usa a mesma busca. */
   base?: string;
 }) {
   const router = useRouter();
-  const nomeEscolhido = selecionado?.nome ?? "";
+  const nomeEscolhido = selecionada?.identificacao ?? "";
   const [texto, setTexto] = useState(nomeEscolhido);
   const [aberto, setAberto] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
@@ -57,39 +57,41 @@ export function BuscaEmpreendimento({
 
   const resultados = useMemo(() => {
     const termo = normalizar(texto.trim());
-    // Campo em branco mostra tudo: o usuário clicou para ver as opções, não
-    // para adivinhar o que digitar.
     const lista =
       termo === "" || termo === normalizar(nomeEscolhido)
-        ? empreendimentos
-        : empreendimentos.filter(
-            (e) =>
-              normalizar(e.nome).includes(termo) ||
-              normalizar(e.incorporadora).includes(termo),
+        ? unidades
+        : unidades.filter(
+            (u) =>
+              normalizar(u.identificacao).includes(termo) ||
+              normalizar(u.tipologia ?? "").includes(termo),
           );
     return lista.slice(0, MAX_RESULTADOS);
-  }, [texto, empreendimentos, nomeEscolhido]);
+  }, [texto, unidades, nomeEscolhido]);
 
-  const escolher = (e: EmpreendimentoSimulavel) => {
+  const desativado = !empreendimentoId;
+
+  const escolher = (u: UnidadeSimulavel) => {
     setAberto(false);
     campo.current?.blur();
-    iniciar(() => router.replace(`${base}?e=${e.id}`));
+    iniciar(() => router.replace(`${base}?e=${empreendimentoId}&u=${u.id}`));
   };
 
   const limpar = () => {
     setTexto("");
     setAberto(true);
     campo.current?.focus();
-    if (selecionado) iniciar(() => router.replace(base));
+    if (selecionada) iniciar(() => router.replace(`${base}?e=${empreendimentoId}`));
   };
 
   return (
     <div className="relative">
       <label
-        htmlFor="busca-empreendimento"
-        className="mb-2 block text-sm font-medium text-foreground"
+        htmlFor="busca-unidade"
+        className={`mb-2 block text-sm font-medium ${
+          desativado ? "text-muted-foreground/70" : "text-foreground"
+        }`}
       >
-        Empreendimento
+        Unidade
       </label>
 
       <div className="relative">
@@ -122,9 +124,10 @@ export function BuscaEmpreendimento({
 
         <input
           ref={campo}
-          id="busca-empreendimento"
+          id="busca-unidade"
           type="text"
           autoComplete="off"
+          disabled={desativado}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
@@ -134,18 +137,17 @@ export function BuscaEmpreendimento({
             setAberto(true);
             e.target.select();
           }}
-          // O atraso deixa o clique num item acontecer antes de fechar a lista.
           onBlur={() => setTimeout(() => { setAberto(false); setTexto(nomeEscolhido); }, 150)}
-          placeholder="Nome do empreendimento"
-          className="w-full h-10 rounded-md border border-input bg-card pr-10 pl-10 text-sm text-foreground shadow-xs placeholder:text-muted-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          placeholder={desativado ? "Escolha o empreendimento" : "Ex.: 302"}
+          className="w-full h-10 rounded-md border border-input bg-card pr-10 pl-10 text-sm text-foreground shadow-xs placeholder:text-muted-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:border-border"
         />
 
-        {texto ? (
+        {texto && !desativado ? (
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={limpar}
-            aria-label="Limpar empreendimento"
+            aria-label="Limpar unidade"
             className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="size-4" aria-hidden="true">
@@ -155,24 +157,31 @@ export function BuscaEmpreendimento({
         ) : null}
       </div>
 
-      {aberto ? (
+      {!desativado && unidades.length > 0 ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {unidades.length} unidade{unidades.length === 1 ? "" : "s"} disponíve
+          {unidades.length === 1 ? "l" : "is"} neste empreendimento
+        </p>
+      ) : null}
+
+      {aberto && !desativado ? (
         resultados.length > 0 ? (
           <ul className="absolute z-20 mt-1 flex max-h-72 w-full flex-col divide-y divide-border overflow-y-auto rounded-lg border bg-popover shadow-md">
-            {resultados.map((e) => (
-              <li key={e.id}>
+            {resultados.map((u) => (
+              <li key={u.id}>
                 <button
                   type="button"
                   onMouseDown={(ev) => ev.preventDefault()}
-                  onClick={() => escolher(e)}
+                  onClick={() => escolher(u)}
                   className={`flex w-full flex-col items-start px-4 py-3 text-left transition-colors hover:bg-accent ${
-                    selecionado?.id === e.id ? "bg-muted/50" : ""
+                    selecionada?.id === u.id ? "bg-muted/50" : ""
                   }`}
                 >
                   <span className="text-sm font-medium text-foreground">
-                    {e.nome}
+                    {u.identificacao}
                   </span>
-                  {e.incorporadora ? (
-                    <span className="text-sm text-muted-foreground">{e.incorporadora}</span>
+                  {caracteristicas(u) ? (
+                    <span className="text-sm text-muted-foreground">{caracteristicas(u)}</span>
                   ) : null}
                 </button>
               </li>
@@ -180,7 +189,7 @@ export function BuscaEmpreendimento({
           </ul>
         ) : (
           <p className="absolute z-20 mt-1 w-full rounded-lg border bg-popover px-4 py-3 text-sm text-muted-foreground shadow-md">
-            Nenhum empreendimento com esse nome.
+            Nenhuma unidade com esse texto.
           </p>
         )
       ) : null}

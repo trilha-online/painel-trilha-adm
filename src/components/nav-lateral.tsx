@@ -165,10 +165,10 @@ export function NavLateral({
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Simulador">
-                    <a href="/simulador" target="_blank" rel="noopener noreferrer">
+                  <SidebarMenuButton asChild tooltip="Nova proposta">
+                    <a href="/proposta" target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="text-muted-foreground" />
-                      <span>Simulador</span>
+                      <span>Nova proposta</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

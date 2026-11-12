@@ -287,10 +287,10 @@ function Confirmacao({ codigo }: { codigo: string }) {
 
       <p className="mt-6">
         <Link
-          href="/simulador"
+          href="/proposta"
           className="font-semibold text-foreground underline-offset-4 hover:underline"
         >
-          Voltar ao simulador
+          Enviar outra proposta
         </Link>
       </p>
     </section>

@@ -130,7 +130,7 @@ export async function enviarProposta(entrada: Entrada): Promise<ResultadoPropost
   if (!simulacao) {
     return {
       ok: false,
-      erro: "Esta unidade não está mais disponível. Volte ao simulador e escolha outra.",
+      erro: "Esta unidade não está mais disponível. Volte e escolha outra unidade.",
     };
   }
 
@@ -244,7 +244,7 @@ export async function enviarProposta(entrada: Entrada): Promise<ResultadoPropost
         error?.code === "TRL01"
           ? AVISO_PROPOSTA_ABERTA
           : error?.code === "23505"
-            ? "Esta unidade acabou de ser negociada. Volte ao simulador e escolha outra."
+            ? "Esta unidade acabou de ser negociada. Volte e escolha outra unidade."
             : "Não consegui registrar a proposta. Tente de novo em instantes.",
     };
   }

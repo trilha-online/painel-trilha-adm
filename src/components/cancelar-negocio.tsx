@@ -99,7 +99,7 @@ export default function CancelarNegocio({
         >
           Volta a ficar disponível
           <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-            O negócio caiu, mas a unidade continua à venda e volta ao simulador.
+            O negócio caiu, mas a unidade continua à venda e volta para o estoque disponível.
           </span>
         </button>
 
@@ -111,7 +111,7 @@ export default function CancelarNegocio({
         >
           Sai do estoque
           <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-            A unidade não é mais para vender. Some do simulador e do painel do corretor.
+            A unidade não é mais para vender. Sai do estoque disponível e do painel do corretor.
           </span>
         </button>
       </div>

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Rotas que existem sem sessão. `/simulador` é a ferramenta do corretor,
+// Rotas que existem sem sessão. `/proposta` é a ferramenta do corretor,
 // `/condicoes` é a página que ele envia ao cliente, `/primeiro-acesso` é o
 // link de convite que ele recebe no WhatsApp e `/acompanhar` é o link
 // permanente do comprador: quem tem o link entra, sem conta e sem senha.
@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // segredo antes de qualquer coisa.
 const PUBLIC_ROUTES = [
   "/login",
-  "/simulador",
+  "/proposta",
   "/condicoes",
   "/primeiro-acesso",
   "/acompanhar",
@@ -18,6 +18,19 @@ const PUBLIC_ROUTES = [
   "/api/cron",
   "/minuta",
 ];
+
+/**
+ * A rota é pública se for EXATAMENTE uma da lista, ou um caminho abaixo dela.
+ *
+ * Era um `startsWith` simples, e com `/simulador` nunca deu problema porque
+ * nenhuma rota do painel começava com essa palavra. Com `/proposta` dá: o
+ * painel tem `/propostas`, e `"/propostas".startsWith("/proposta")` é
+ * verdadeiro — a fila de propostas da Trilha teria virado página pública, sem
+ * erro nenhum na tela, só o RLS segurando. Comparar por segmento fecha essa
+ * classe inteira de acidente, não só este caso.
+ */
+const ehPublica = (pathname: string) =>
+  PUBLIC_ROUTES.some((rota) => pathname === rota || pathname.startsWith(`${rota}/`));
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -46,7 +59,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+  const isPublic = ehPublica(pathname);
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

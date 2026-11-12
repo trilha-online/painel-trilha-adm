@@ -74,7 +74,7 @@ export default async function AcessoParceiroPage({
 
       {veioDeProposta ? (
         <p className="mb-6 max-w-3xl rounded-md border border-aviso/20 bg-aviso-suave px-5 py-4 text-sm text-aviso">
-          Este cadastro nasceu de uma proposta enviada pelo simulador e está{" "}
+          Este cadastro nasceu de uma proposta enviada pela página pública e está{" "}
           <strong>aguardando aprovação</strong>. Criar o acesso aqui libera a entrada dele na
           plataforma.
         </p>

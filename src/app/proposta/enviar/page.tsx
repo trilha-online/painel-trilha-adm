@@ -11,9 +11,9 @@ import { caracteristicas } from "@/lib/unidade";
 import FormProposta, { type CorretorConhecido } from "./form";
 
 /**
- * Enviar proposta.
+ * Enviar proposta — o segundo degrau de `/proposta`.
  *
- * A tela chega sempre de um card do simulador, com a condição já escolhida —
+ * A tela chega sempre de um card da escolha de unidade, com a condição já escolhida —
  * por isso ela mostra esse card de novo, fixo ao lado do formulário. O corretor
  * está preenchendo dados do cliente dele; ter os números sumindo da vista
  * enquanto digita é o jeito mais fácil de mandar a condição errada.
@@ -46,14 +46,14 @@ export default async function PropostaPage({
       <Moldura>
         <AvisoPublico>
           Não encontrei esta condição. A unidade pode ter saído do estoque ou as condições podem ter
-          mudado desde que você abriu o simulador.
+          mudado desde que você abriu a página.
         </AvisoPublico>
         <p className="mt-4">
           <Link
-            href="/simulador"
+            href="/proposta"
             className="font-semibold text-foreground underline-offset-4 hover:underline"
           >
-            Voltar ao simulador
+            Escolher outra unidade
           </Link>
         </p>
       </Moldura>
@@ -82,11 +82,11 @@ export default async function PropostaPage({
     <Moldura>
       <header className="mb-6 flex flex-col gap-1">
         <Link
-          href={`/simulador?e=${simulacao.empreendimentoId}&u=${unidade.id}`}
+          href={`/proposta?e=${simulacao.empreendimentoId}&u=${unidade.id}`}
           className="-ml-1 mb-2 inline-flex w-fit items-center gap-1 rounded-md px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
-          Voltar à simulação
+          Voltar às condições
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Enviar proposta
@@ -119,10 +119,9 @@ export default async function PropostaPage({
 function Moldura({ children }: { children: React.ReactNode }) {
   return (
     <MolduraPublica
-      contexto="Proposta"
       acao={<AcessoCorretor />}
       largura="6xl"
-      rodape="A proposta passa por análise da equipe da Trilha. Enviar não reserva a unidade."
+      rodape="Enviar uma proposta não reserva a unidade. Sua proposta será analisada pela nossa equipe e você será avisado assim que tivermos atualizações."
     >
       {children}
     </MolduraPublica>

@@ -14,6 +14,29 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "4.5mb",
     },
   },
+
+  /**
+   * `/simulador` virou `/proposta` em nov/2026.
+   *
+   * O redirecionamento não é cortesia: aquele link já foi para dezenas de
+   * conversas de WhatsApp, com `?e=` e `?u=` apontando para uma unidade
+   * específica, e está no material impresso do corretor. O Next leva a query
+   * junto sozinho, então o cliente que abrir o link velho cai na mesma
+   * unidade, na mesma condição.
+   *
+   * `permanent: true` manda 308: o navegador passa a ir direto, e a rota
+   * antiga some do histórico de quem já usou.
+   *
+   * A ordem importa — a regra mais específica vem primeiro, senão
+   * `/simulador/proposta` cairia na regra genérica e viraria
+   * `/proposta/proposta`, que não existe.
+   */
+  async redirects() {
+    return [
+      { source: "/simulador/proposta", destination: "/proposta/enviar", permanent: true },
+      { source: "/simulador", destination: "/proposta", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

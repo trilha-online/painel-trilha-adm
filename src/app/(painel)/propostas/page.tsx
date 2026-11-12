@@ -110,8 +110,8 @@ export default async function PropostasPage() {
           titulo="Nenhuma proposta ainda"
           texto={
             corretor
-              ? "Abra o simulador, escolha a unidade e a condição, e envie a proposta. Ela aparece aqui com a situação."
-              : "As propostas chegam pelo simulador, quando um corretor escolhe uma condição e envia os dados do comprador."
+              ? "Abra Nova proposta, escolha a unidade e a condição, e envie. Ela aparece aqui com a situação."
+              : "As propostas chegam quando um corretor escolhe uma condição e envia os dados do comprador."
           }
         />
       ) : (

@@ -17,8 +17,16 @@ import { BuscaUnidade } from "./busca-unidade";
 import Compartilhar from "./compartilhar";
 
 /**
- * O simulador é a única tela do sistema que um comprador vê. Ele é público de
- * propósito: quem tem o link entra, sem conta e sem senha.
+ * A proposta, do começo: escolher a unidade, ver as condições e enviar.
+ *
+ * Era `/simulador` até nov/2026. O nome mudou porque descrevia o meio do
+ * caminho, não o destino: o corretor não vem aqui para simular, vem para
+ * mandar proposta — simular é o que ele faz enquanto decide qual. A rota
+ * antiga continua viva por redirecionamento permanente (`next.config.ts`),
+ * porque já foi para dezenas de conversas de WhatsApp.
+ *
+ * É a única tela do sistema que um comprador vê, e é pública de propósito:
+ * quem tem o link entra, sem conta e sem senha.
  *
  * `noindex` porque público aqui quer dizer "acessível por link", não
  * "publicado". Preço de unidade não deve virar resultado de busca do Google.
@@ -32,12 +40,12 @@ import Compartilhar from "./compartilhar";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Simulador · Trilha",
-  description: "Simule a entrada parcelada de uma unidade.",
+  title: "Nova proposta · Trilha",
+  description: "Escolha a unidade, veja as condições e envie a proposta de trilha.",
   robots: { index: false, follow: false },
 };
 
-export default async function SimuladorPage({
+export default async function PropostaPage({
   searchParams,
 }: {
   searchParams: Promise<{ e?: string; u?: string }>;
@@ -51,7 +59,7 @@ export default async function SimuladorPage({
     return (
       <Moldura>
         <AvisoPublico>
-          O simulador está indisponível no momento. Tente de novo em alguns minutos.
+          A página está indisponível no momento. Tente de novo em alguns minutos.
         </AvisoPublico>
       </Moldura>
     );
@@ -143,7 +151,7 @@ function Resultado({
             <div key={c.ordem} className="grid snap-start grid-rows-[1fr_auto] gap-3">
               <CardPagamento condicao={c} modo="publico" />
               <Link
-                href={`/simulador/proposta?e=${empreendimentoId}&u=${unidade.id}&c=${c.ordem}`}
+                href={`/proposta/enviar?e=${empreendimentoId}&u=${unidade.id}&c=${c.ordem}`}
                 className={cn(buttonVariants({ variant: "default" }), "h-10 w-full")}
               >
                 Enviar proposta
@@ -170,17 +178,26 @@ function Resultado({
   );
 }
 
-/** A moldura pública, com o título da ferramenta. */
+/**
+ * A moldura pública.
+ *
+ * Sem `contexto`: a palavra solta ao lado do botão de entrar se lia como o
+ * destino dele ("entrar no simulador"). O h1 logo abaixo já diz o que é a
+ * página, e o botão agora diz para onde leva.
+ */
 function Moldura({ children }: { children: React.ReactNode }) {
   return (
     <MolduraPublica
-      contexto="Simulador"
       acao={<AcessoCorretor />}
-      rodape="Valores sujeitos a confirmação. Simulação não constitui proposta nem reserva de unidade."
+      rodape="Enviar uma proposta não reserva a unidade. Sua proposta será analisada pela nossa equipe e você será avisado assim que tivermos atualizações."
     >
       <header className="mb-6 flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Simulador</h1>
-        <p className="text-sm text-muted-foreground">Condições de pagamento por unidade.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Envie uma proposta de Trilha
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Escolha o empreendimento, a unidade e a condição de pagamento.
+        </p>
       </header>
       {children}
     </MolduraPublica>

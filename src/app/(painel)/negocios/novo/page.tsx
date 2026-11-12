@@ -9,8 +9,8 @@ import {
 } from "@/lib/simulador";
 import { caracteristicas } from "@/lib/unidade";
 import { Alert, PageHeader } from "@/components/ui";
-import { BuscaEmpreendimento } from "@/app/simulador/busca-empreendimento";
-import { BuscaUnidade } from "@/app/simulador/busca-unidade";
+import { BuscaEmpreendimento } from "@/app/proposta/busca-empreendimento";
+import { BuscaUnidade } from "@/app/proposta/busca-unidade";
 import FormNovaNegociacao from "@/components/form-nova-negociacao";
 
 /**

@@ -67,7 +67,7 @@ export default function DecisaoProposta({ id, unidade }: { id: string; unidade: 
             <>
               A unidade <strong className="text-foreground">{unidade}</strong> sai do estoque
               disponível e entra em negociação. As outras propostas abertas desta unidade são
-              invalidadas na mesma hora, e ela some do simulador.
+              invalidadas na mesma hora, e ela sai do estoque disponível.
             </>
           ) : (
             <>

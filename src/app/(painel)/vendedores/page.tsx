@@ -29,6 +29,7 @@ export const dynamic = "force-dynamic";
 type Linha = {
   id: string;
   tipo: string;
+  ativo: boolean;
   nome: string;
   cnpj: string | null;
   email: string;
@@ -65,10 +66,11 @@ export default async function VendedoresPage({
   let consulta = createAdminClient()
     .from("incorporadora")
     .select(
-      `id, tipo, nome, cnpj, email, telefone,
+      `id, tipo, ativo, nome, cnpj, email, telefone,
        resp_nome, resp_cpf, resp_email, resp_telefone, conta_id,
        empreendimento (imovel (count))`,
     )
+    .order("ativo", { ascending: false })
     .order("nome");
 
   if (filtro !== "todos") consulta = consulta.eq("tipo", filtro);
@@ -182,7 +184,11 @@ export default async function VendedoresPage({
                         {nome}
                       </Link>
                       <span className="block text-sm text-muted-foreground">
-                        {v.conta_id ? "acesso criado" : "sem acesso"}
+                        {v.ativo
+                          ? v.conta_id
+                            ? "acesso criado"
+                            : "sem acesso"
+                          : "desativado · fora do simulador"}
                       </span>
                     </td>
 

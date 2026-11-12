@@ -300,3 +300,65 @@ export async function atualizarPerfil(bruto: unknown): Promise<Resultado> {
   revalidatePath("/perfil");
   return { id: sessao.incorporadoraId, erro: null };
 }
+
+// --------------------------------------------------- ativar / desativar
+
+/**
+ * Liga ou desliga um vendedor — incorporadora ou proprietário pessoa física.
+ *
+ * Uma chave, dois efeitos, e os dois moram no banco:
+ *
+ * - **o login para.** `minha_incorporadora_id()` exige `ativo`, e é ela que
+ *   recorta todas as policies do vendedor. Não existe tela esquecida.
+ * - **o estoque sai do ar.** A leitura pública (`lib/simulador.ts`) filtra
+ *   vendedor inativo, no simulador, no `/condicoes` e no envio da proposta.
+ *
+ * O que NÃO acontece, por decisão: os corretores dela continuam ativos, cada
+ * um com o próprio `parceiro.ativo`. E nada é apagado — as trilhas em
+ * andamento, as propostas e o histórico seguem intactos, porque desativar é
+ * sobre acesso e vitrine, não sobre o passado.
+ *
+ * Escreve pela chave de servidor: `incorporadora` tem policy de escrita só
+ * para o admin, e desativar um vendedor é ato de admin por definição — quem
+ * está sendo desligado não pode se desligar nem se religar.
+ */
+export async function definirAtivoVendedor(id: string, ativo: boolean): Promise<Resultado> {
+  const sessao = await getSessao();
+  if (!sessao?.conta) return { id: null, erro: "Sessão expirada. Entre de novo." };
+  if (!ehAdmin(sessao)) {
+    return { id: null, erro: "Só um administrador da Trilha pode ativar ou desativar vendedores." };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      id: null,
+      erro: "A chave de administrador do Supabase não está configurada no .env.local.",
+    };
+  }
+
+  const { data, error } = await admin
+    .from("incorporadora")
+    .update({ ativo })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error || !data) {
+    return {
+      id: null,
+      erro: detalhar(
+        ativo ? "Não foi possível reativar o vendedor." : "Não foi possível desativar o vendedor.",
+        error,
+      ),
+    };
+  }
+
+  revalidatePath("/vendedores");
+  revalidatePath(`/incorporadoras/${id}`);
+  revalidatePath(`/proprietarios/${id}`);
+  revalidatePath("/empreendimentos");
+  return { id, erro: null };
+}

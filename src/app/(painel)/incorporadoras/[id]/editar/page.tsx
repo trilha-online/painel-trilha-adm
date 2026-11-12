@@ -4,10 +4,12 @@ import { getSessao } from "@/lib/sessao";
 import { maskCNPJ, maskCPF, maskPhone } from "@/lib/br";
 import { PageHeader } from "@/components/ui";
 import FormIncorporadora from "@/components/form-incorporadora";
+import { AtivarVendedor } from "@/components/ativar-vendedor";
 import type { IncorporadoraFormValues } from "@/lib/schemas";
 
 type Registro = {
   nome: string;
+  ativo: boolean;
   cnpj: string;
   email: string;
   telefone: string;
@@ -64,7 +66,7 @@ export default async function EditarIncorporadoraPage({
   const { data, error } = await createAdminClient()
     .from("incorporadora")
     .select(
-      `nome, cnpj, email, telefone, endereco,
+      `nome, ativo, cnpj, email, telefone, endereco,
        resp_nome, resp_cpf, resp_rg, resp_profissao, resp_cargo, resp_estado_civil,
        resp_email, resp_telefone, resp_endereco,
        banco, agencia, conta_numero, chave_pix, chave_pix_tipo`,
@@ -104,6 +106,15 @@ export default async function EditarIncorporadoraPage({
     acesso: { email: "", senha: "" },
   };
 
+
+  // Quantas unidades disponíveis saem do ar ao desativar. A pessoa precisa
+  // ver esse número antes de confirmar.
+  const { count: unidades } = await createAdminClient()
+    .from("imovel")
+    .select("id, empreendimento!inner(incorporadora_id)", { count: "exact", head: true })
+    .eq("status", "disponivel")
+    .eq("empreendimento.incorporadora_id", id);
+
   return (
     <>
       <PageHeader
@@ -111,7 +122,17 @@ export default async function EditarIncorporadoraPage({
         descricao={data.nome}
         voltar={{ href: `/incorporadoras/${id}`, label: "Voltar para a ficha" }}
       />
-      <FormIncorporadora modo="editar" id={id} inicial={inicial} />
+      <div className="flex flex-col gap-8">
+        <FormIncorporadora modo="editar" id={id} inicial={inicial} />
+
+        <AtivarVendedor
+          id={id}
+          nome={data.nome}
+          ativo={data.ativo}
+          unidades={unidades ?? 0}
+          pessoaFisica={false}
+        />
+      </div>
     </>
   );
 }

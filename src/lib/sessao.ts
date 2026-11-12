@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ContaTipo = "trilha_admin" | "incorporadora" | "parceiro";
 
@@ -25,6 +26,13 @@ export type Sessao = {
   parceiroTrilha: boolean;
   /** Conta de vendedor pessoa física (mora na tabela `incorporadora`, tipo PF). */
   proprietarioPF: boolean;
+  /**
+   * Vendedor com o cadastro desativado. O banco já o cega sozinho
+   * (`minha_incorporadora_id()` devolve null), e isto é o espelho no app: sem
+   * ele, a pessoa entraria num painel que responde vazio em tudo, em vez de
+   * ler que o acesso foi desligado.
+   */
+  vendedorDesativado: boolean;
   /**
    * Motivo de a ficha não ter sido lida, quando o banco recusou a consulta.
    * `null` com `conta` também nulo significa que a linha realmente não existe.
@@ -71,15 +79,21 @@ export async function getSessao(): Promise<Sessao | null> {
 
   let incorporadoraId: string | null = null;
   let proprietarioPF = false;
+  let vendedorDesativado = false;
 
   if (conta?.tipo === "incorporadora") {
-    const { data } = await supabase
+    // Pela CHAVE DE SERVIDOR, e não pela sessão: a policy que deixaria ela ler
+    // a própria ficha passa por `minha_incorporadora_id()`, que devolve null
+    // justamente quando o cadastro está desativado. Lendo pela sessão, a linha
+    // sumiria — e o app não saberia distinguir "desativada" de "não existe".
+    const { data } = await createAdminClient()
       .from("incorporadora")
-      .select("id, tipo")
+      .select("id, tipo, ativo")
       .eq("conta_id", user.id)
-      .maybeSingle<{ id: string; tipo: string }>();
+      .maybeSingle<{ id: string; tipo: string; ativo: boolean }>();
     incorporadoraId = data?.id ?? null;
     proprietarioPF = data?.tipo === "proprietario_pf";
+    vendedorDesativado = Boolean(data) && !data!.ativo;
   }
 
   // Parceiro sem incorporadora = Parceiro Trilha. Muda o menu e as regras de
@@ -115,6 +129,7 @@ export async function getSessao(): Promise<Sessao | null> {
     incorporadoraId,
     parceiroTrilha,
     proprietarioPF,
+    vendedorDesativado,
     erroLeitura: error ? `${error.code ?? "sem código"} · ${error.message}` : null,
     uidNoBanco,
     token,
@@ -134,9 +149,21 @@ export async function getSessao(): Promise<Sessao | null> {
 export const ehAdmin = (sessao: Sessao | null) =>
   sessao?.conta?.tipo === "trilha_admin" && sessao.conta.ativo;
 
-/** Conta que existe mas está com o acesso desligado. */
+/**
+ * Conta que existe mas está com o acesso desligado.
+ *
+ * Dois interruptores diferentes, um resultado só: `conta.ativo` desliga
+ * administrador da Trilha, `incorporadora.ativo` desliga vendedor. São
+ * tabelas separadas porque desligam coisas separadas — um login e um
+ * cadastro —, mas para quem tenta entrar a resposta é a mesma tela.
+ *
+ * O corretor fica de fora de propósito: `parceiro.ativo` já existia antes
+ * desta tela e desativar corretor sempre significou "ele entra e não vê
+ * estoque", não "ele não entra". Mudar isso é decisão de produto, não limpeza
+ * de código.
+ */
 export const contaDesativada = (sessao: Sessao | null) =>
-  Boolean(sessao?.conta) && !sessao!.conta!.ativo;
+  Boolean(sessao?.conta) && (!sessao!.conta!.ativo || sessao!.vendedorDesativado);
 
 export const ehParceiro = (sessao: Sessao | null) => sessao?.conta?.tipo === "parceiro";
 
